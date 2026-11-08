@@ -20,7 +20,10 @@ def state(value):
 
 def validate(options, roles):
     from .model import exact
-    exact(options, ("role", "prepare_start", "actions"), "journey")
+    extra = ("prepare_between_actions",) if "prepare_between_actions" in options else ()
+    exact(options, ("role", "prepare_start", "actions") + extra, "journey")
+    if extra and type(options["prepare_between_actions"]) is not bool:
+        raise ValueError("Explicit between-action setup Boolean required")
     if options["role"] not in roles or type(options["prepare_start"]) is not bool:
         raise ValueError("Journey requires a declared role and explicit setup choice")
     actions = options["actions"]
@@ -63,8 +66,22 @@ def safe_row(row):
 
 class Journey:
     """Protocol decisions are testable with a peer adapter; commands remain typed."""
-    def __init__(self, peer, query, clock=time.monotonic, sleep=time.sleep):
+    def __init__(self, peer, query, clock=time.monotonic, sleep=time.sleep, complete_arrival=None):
         self.peer, self.query, self.clock, self.sleep = peer, query, clock, sleep
+        self.complete_arrival = complete_arrival
+
+    def run(self, options):
+        validate(options, [options["role"]])
+        if options["prepare_start"]:
+            self.prepare(options["actions"][0]["source"])
+        for index, action in enumerate(options["actions"]):
+            if index and options.get("prepare_between_actions", False):
+                row = self.row()
+                if (not matches(row, action["source"]) or row.get("group") not in ("null", "0") or
+                        row.get("combat") != "0"):
+                    raise RuntimeError("Between-action setup requires the expected solo, quiet source")
+                self.position()
+            self.action(action)
 
     def row(self):
         row = self.peer.row()
@@ -167,10 +184,13 @@ class Journey:
                     abs(float(after[k]) - float(before[k])) > .01 for k in ("x", "y", "z"))):
                 raise RuntimeError("Cancel changed the actor's location")
         else:
-            scene = session.wait("scene_ready", action["timeout_seconds"], after=stamp)
-            if scene.get("scene") != "terrain/dungeon1.trn":
+            if self.complete_arrival is None:
+                raise RuntimeError("Matching driver ground-loading adapter required")
+            loading = self.complete_arrival(session, self.query, action["expected"], action["timeout_seconds"])
+            if loading["readiness"].get("scene") != "terrain/dungeon1.trn":
                 raise RuntimeError("Client readiness reports an unexpected destination scene")
             after = self.wait_state(action["expected"], action["timeout_seconds"])
+            self.peer.report.setdefault("loading", []).append(loading)
         self.peer.report["checks"].append({"kind": "radial_dialog", "setup": setup, "selector": action["selector"],
                                             "answer": action["answer"], "before": before, "after": after})
         return after
@@ -186,13 +206,10 @@ def run_live(options, env, registry):
     import retained_peer
     if Path(retained_peer.__file__).resolve().parent != tools.resolve() or getattr(retained_peer, "PROTOCOL_PEER_VERSION", None) != 1:
         raise ValueError("Unexpected retained-peer adapter")
-    from protocol_driver import bot_query
+    from protocol_driver import bot_query, complete_ground_arrival
     with retained_peer.open_peer(env["folder"], env["binary"], registry) as peer:
-        engine = Journey(peer, lambda command: bot_query(peer.project, peer.bot, command))
-        if options["prepare_start"]:
-            engine.prepare(options["actions"][0]["source"])
-        for action in options["actions"]:
-            engine.action(action)
+        engine = Journey(peer, lambda command: bot_query(peer.project, peer.bot, command), complete_arrival=complete_ground_arrival)
+        engine.run(options)
     import hashlib
     result = peer.evidence / "result.json"
     return {"path": str(result), "sha256": hashlib.sha256(result.read_bytes()).hexdigest()}

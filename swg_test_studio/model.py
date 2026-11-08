@@ -52,7 +52,13 @@ def validate(data, *, runnable=False):
             any(not isinstance(r, str) or not ROLE.fullmatch(r) for r in roles) or len(set(roles)) != len(roles)):
         raise ValueError("At most five distinct named test roles are supported")
     review = data["review"]
-    exact(review, ("approved", "recording", "unsupported"), "review")
+    extra = ("capture_ranges",) if isinstance(review, dict) and "capture_ranges" in review else ()
+    exact(review, ("approved", "recording", "unsupported") + extra, "review")
+    if extra:
+        from .clips import validate_ranges
+        validate_ranges(review["capture_ranges"])
+        if review["recording"] is None:
+            raise ValueError("Recording clips require their source recording ID")
     if (type(review["approved"]) is not bool or
             (review["recording"] is not None and (not isinstance(review["recording"], str) or
                                                 not re.fullmatch(r"[a-f0-9]{32}", review["recording"]))) or

@@ -63,6 +63,7 @@ def main(argv=None):
         if action == "record-draft":
             child.add_argument("--id", required=True)
             child.add_argument("--title", required=True)
+            child.add_argument("--range", dest="capture_ranges", action="append", help="Explicit FIRST:LAST clip; repeat for separate cases")
     args = parser.parse_args(argv)
     if args.command is None or args.command == "gui":
         from .gui import launch
@@ -102,7 +103,8 @@ def main(argv=None):
             elif args.command == "record-stop":
                 result = recording.stop(args.workspace, args.recording)
             else:
-                result = recording.draft(args.workspace, args.recording, args.id, args.title)
+                from .clips import parse_ranges
+                result = recording.draft(args.workspace, args.recording, args.id, args.title, parse_ranges(args.capture_ranges))
             emit(result)
         return 0
     except (Exception, KeyboardInterrupt) as exc:

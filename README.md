@@ -10,8 +10,10 @@ requests, offered dialogs, matching callbacks and authored arrivals become a
 typed journey, using fresh runtime target/page identities during replay. Users
 review the captured expectations before approving a draft. Unsupported actions
 remain blocked. General movement, flight-path replay, other terminals and
-multi-actor recording are pending. Live capture/replay acceptance is still pending;
-component tests and native builds do not establish that gate.
+multi-actor recording are pending. On November 8, 2026, automated live capture,
+explicit clip export and replay passed for cancellation and both shuttle
+directions. A connected-session round trip also passed. Human Windows-client
+recording and visual acceptance remain pending.
 
 ## Start
 
@@ -94,6 +96,7 @@ private: inherited server diagnostics can contain sensitive fields.
 | `group_disband` | Three retained roles and the existing reviewed linked Rryatt/Ord fixture; disband, solo behavior and new-group affinity |
 | `driver_guards` | Existing driver's unit regressions; no live game actions |
 | `terminal_journey` | Connected-session Gamma round trip with fresh terminal/dialog resolution, exact authored rooms and full logout/save |
+| `shuttle_recorded_cases` | Three portable cases derived from accepted live recording: cancel, travel to Gamma, return to the correct station hangar; each has its own setup/login/logout/save lifecycle |
 
 Roles used by each example must be present in the environment. At most five
 distinct actors execute. Saved-suite adapters expose an explicit ordinary-action
@@ -117,8 +120,11 @@ schema and explicit `GameServer.testStudioRecorder=true` can collect events.
 Record never changes configuration or starts/restarts services. The native flag
 defaults to false; production role configuration must leave it false.
 
-Create no extra permissions. Recording uses the fixture's existing verified
-writable `/fixture` mount. It accepts only exact registered non-god test character
+Prepare the isolated fixture with the explicit `--test-studio-recording` option
+and its matching native contract. This supplies a dedicated writable
+`/teststudio-capture` bind; the existing `/fixture` tools mount remains read-only.
+Record checks the prepared profile, effective game-role flag and exact mount.
+It accepts only exact registered non-god test character
 name, actor ID and station ID. The first implementation records one selected role
 for 30–3600 seconds, with 4096 events/8 MiB bounds and visible incomplete-capture
 errors. It records scene publication, menu requests, offered pages, movement
@@ -154,6 +160,16 @@ contracts, walking, unknown commands and unrelated dialogs stay unsupported.
 Unsupported captures remain inspectable as observation drafts; approving a test
 never makes observation-only steps executable.
 
+You can choose completed actions from a longer recording using explicit clips.
+In Record, enter inclusive sequence ranges such as `6:8, 16:21` from your own
+timeline before Export draft. The CLI accepts repeated `--range FIRST:LAST`
+options. Each clip becomes a separate journey case with declared start setup;
+the original recording ID and selected ranges stay in the review metadata.
+The full raw timeline remains available. Unsupported or incomplete interactions
+inside a selected clip block approval, and corruption anywhere in the capture
+blocks export. Blank selection uses the entire recording. Nothing is trimmed
+automatically; starting a new recording clears the previous clip selection.
+
 In Edit, review expectations, use **Approve reviewed expectations**, then Save,
 Preview and Run. Approval cannot clear unresolved unsupported actions. Replay
 resolves the unique current-copy terminal through the read-only fixture helper
@@ -166,7 +182,18 @@ family, then the existing fixture-only terminal-proximity setup positions the
 actor. Setup is separate from measured actions. It requires an ungrouped, quiet
 actor already in a supported public station family and never resets quest data.
 Set `prepare_start=false` to require the actor's current saved source/proximity.
+The `terminal_journey` example also declares `prepare_between_actions=true`:
+Gamma's authored arrival is outside the return terminal's eight-metre interaction
+range, so the existing fixture-only proximity setup is explicitly repeated.
+This option defaults to false. It requires the expected source, solo membership
+and no combat; it does not infer or replay walking.
 Ordinary access, combat and ownership rules remain active on the server.
+Same-world room transfers use the existing driver's loading-complete handshake
+after the authored destination is observed, followed by independent native
+settlement and protection-expiry checks. The matching server observes completed
+loading and publishes granted public-cell placement before the scene. It retains
+the original private/group access boundary.
+
 
 The server fixture needs the new `terminal_metadata=2` helper, version-2 native
 capture fields and `retained_peer` adapter. Old helpers are refused. Captures
@@ -182,6 +209,13 @@ python tests/gui_smoke.py
 
 The hidden-window smoke checks Studio's own widgets; it is not game rendering
 acceptance. Protocol/server, unit/component and Windows visual outcomes remain
-separate. The initial implementation has not been deployed to a game fixture or
-used for a fresh human-recording/automated-replay journey. Stage 8 acceptance
-remains owned by the SWG server project and is not changed by this application.
+separate. The accepted live gate used one dedicated actor in the retained isolated
+SWG fixture, a matched ELF64 server/driver and actual native recording events.
+All three selected cases replayed with fresh offered dialogs, settled arrivals,
+full unload and saved-position checks. The complete raw capture is retained;
+login/setup transitions outside the explicit clips remain unsupported as whole-
+timeline replay. Other bundled server recipes have schema/adapter coverage and
+their own server acceptance history; they were not all rerun for this milestone.
+Human recording, generic movement, other terminal compilers and multi-actor
+recording remain open. Stage 8 acceptance remains owned by the SWG server project
+and is not changed by this application.

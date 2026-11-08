@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory() as workspace:
     try:
         app = Studio(root, workspace)
         root.update_idletasks()
-        assert len(app.tree.get_children()) == 7
+        assert len(app.tree.get_children()) == 8
         app.tree.selection_set("example:login_relogin")
         app.open_selected()
         assert app.current()["id"] == "login_relogin"
@@ -24,6 +24,14 @@ with tempfile.TemporaryDirectory() as workspace:
         suite=app.current();suite['review']['approved']=False
         app.set_editor(suite);app.approve()
         assert app.current()['review']['approved'] is True
+        calls = []
+        app.job = lambda *args: calls.append(args)
+        app.capture_ranges.set("2:5, 7:10")
+        app.export_draft()
+        assert calls[-1][-4:] == ("--range", "2:5", "--range", "7:10")
+        app.messages.put('{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","state":"armed_waiting_for_server_events"}')
+        app.poll()
+        assert app.capture_ranges.get() == ""
         print("GUI smoke passed: library, editor, validation and four views")
     finally:
         root.destroy()

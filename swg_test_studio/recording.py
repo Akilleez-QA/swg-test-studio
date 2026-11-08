@@ -29,11 +29,17 @@ def start(env, workspace, role, seconds=600):
     driver, _ = driver_modules(env)
     with studio_lock(workspace), driver.operation_lock(driver.REPO / "StarWarsGalaxies"):
         project, schema, services = driver.fixture(Path(env["folder"]))
+        root = root_for(env)
         mount = next((m for m in services["game"]["Mounts"] if m["Destination"] == "/fixture"), None)
-        if not mount or Path(mount["Source"]).resolve() != Path(env["folder"]) / "fixture" or not mount.get("RW"):
-            raise ValueError("Recording requires the verified writable fixture mount")
+        capture_mount = next((m for m in services["game"]["Mounts"] if m["Destination"] == "/teststudio-capture"), None)
+        if (not mount or Path(mount["Source"]).resolve() != Path(env["folder"]) / "fixture" or
+                not capture_mount or Path(capture_mount["Source"]).resolve() != root or not capture_mount.get("RW")):
+            raise ValueError("Recording requires the exact dedicated writable capture mount")
+        profile = read_json(Path(env["folder"]) / "runtime/stage5-report.json")
+        if profile.get("test_studio_recording") is not True:
+            raise ValueError("Prepare the fixture with the explicit --test-studio-recording option")
         section, enabled = "", None
-        for raw in (Path(env["folder"]) / "runtime/runtime.cfg").read_text().splitlines():
+        for raw in (Path(env["folder"]) / "runtime/config/game.cfg").read_text().splitlines():
             line = raw.strip()
             if line.startswith("[") and line.endswith("]"):
                 section = line[1:-1]
@@ -47,12 +53,15 @@ def start(env, workspace, role, seconds=600):
         bot = driver.identity(read_json(registry))
         if "player" not in bot or "station" not in bot:
             raise ValueError("Recording requires an existing fully registered test character")
-        root = root_for(env)
         root.mkdir(mode=0o700, exist_ok=True)
         if any(root.glob("*.control")):
             raise ValueError("Stop the existing recording first; expired controls require explicit Stop")
         token, expiry = secrets.token_hex(16), int(time.time()) + seconds
         (root / token).mkdir(mode=0o700)
+        # Keep the event file owned by the host operator even when the native
+        # worker runs under a different container UID.
+        with (root / token / "events.jsonl").open("x", encoding="utf-8") as events:
+            os.chmod(events.name, 0o600)
         control = f"SWGTS1 {token} {expiry} {bot['station']} {bot['character']}\n"
         meta = {"schema_version": 1, "id": token, "state": "recording", "expires": expiry,
                 "environment": env, "project": project, "schema": schema,
@@ -143,23 +152,32 @@ def stop(workspace, token):
     return status(workspace, token)
 
 
-def draft(workspace, token, name, title):
+def draft(workspace, token, name, title, ranges=None):
     identifier(name)
     _, meta, _ = load(workspace, token)
     capture = status(workspace, token)
     if capture["state"] != "stopped" or capture["errors"] or not capture["events"]:
         raise ValueError("Stop a nonempty, complete recording before exporting")
     from .capture_compile import convert
-    actions, unsupported = convert(capture["events"])
+    from .clips import validate_ranges
+    spans = validate_ranges(ranges) if ranges is not None else [{"first": 1, "last": len(capture["events"])}]
+    if spans[-1]["last"] > len(capture["events"]):
+        raise ValueError("Recording clip extends beyond the captured events")
     roles = [v["role"] for v in meta["actors"].values()]
-    if actions and len(roles) == 1:
-        steps = [{"id": "recorded_journey", "action": "journey", "options": {
-            "role": roles[0], "prepare_start": True, "actions": actions}}]
-    else:
-        steps = [{"id": "observe_" + str(e["sequence"]), "action": "recorded_observation",
-              "options": {"summary": e["event"] + ": " + str(e["data"].get("scene", "unknown scene"))}}
-                 for e in capture["events"][:32]]
+    steps, unsupported = [], []
+    for index, span in enumerate(spans):
+        events = capture["events"][span["first"] - 1:span["last"]]
+        actions, problems = convert(events)
+        unsupported.extend((f"Clip {index + 1}: " if len(spans) > 1 else "") + p for p in problems)
+        if actions and len(roles) == 1:
+            steps.append({"id": "recorded_journey" + (f"_{index + 1}" if len(spans) > 1 else ""),
+                          "action": "journey", "options": {"role": roles[0], "prepare_start": True, "actions": actions}})
+        else:
+            steps.extend({"id": "observe_" + str(e["sequence"]), "action": "recorded_observation",
+                          "options": {"summary": e["event"] + ": " + str(e["data"].get("scene", "unknown scene"))}}
+                         for e in events[:32])
+    review = {"approved": False, "recording": token, "unsupported": unsupported[:128]}
+    if ranges is not None:
+        review["capture_ranges"] = spans
     return {"format": FORMAT, "schema_version": 1, "id": name, "title": title,
-            "category": "regression", "roles": roles, "steps": steps,
-            "review": {"approved": False, "recording": token,
-                       "unsupported": unsupported}}
+            "category": "regression", "roles": roles, "steps": steps[:32], "review": review}

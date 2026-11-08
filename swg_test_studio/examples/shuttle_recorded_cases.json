@@ -1,0 +1,101 @@
+{
+  "format": "swg-test-studio",
+  "schema_version": 1,
+  "id": "shuttle_recorded_cases",
+  "title": "Recorded shuttle cancel, Gamma travel and station return",
+  "category": "regression",
+  "roles": [
+    "actor"
+  ],
+  "steps": [
+    {
+      "id": "recorded_journey_1",
+      "action": "journey",
+      "options": {
+        "role": "actor",
+        "prepare_start": true,
+        "actions": [
+          {
+            "kind": "radial_dialog",
+            "selector": "gamma_shuttle",
+            "menu_type": 21,
+            "prompt": "@npe:gamma_shuttle_prompt",
+            "answer": "cancel",
+            "source": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            },
+            "expected": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            },
+            "timeout_seconds": 120
+          }
+        ]
+      }
+    },
+    {
+      "id": "recorded_journey_2",
+      "action": "journey",
+      "options": {
+        "role": "actor",
+        "prepare_start": true,
+        "actions": [
+          {
+            "kind": "radial_dialog",
+            "selector": "gamma_shuttle",
+            "menu_type": 21,
+            "prompt": "@npe:gamma_shuttle_prompt",
+            "answer": "ok",
+            "source": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            },
+            "expected": {
+              "scene": "dungeon1",
+              "family": "npe_space_dungeon",
+              "room": "cave_entrance"
+            },
+            "timeout_seconds": 120
+          }
+        ]
+      }
+    },
+    {
+      "id": "recorded_journey_3",
+      "action": "journey",
+      "options": {
+        "role": "actor",
+        "prepare_start": true,
+        "actions": [
+          {
+            "kind": "radial_dialog",
+            "selector": "gamma_shuttle",
+            "menu_type": 21,
+            "prompt": "@npe:gamma_shuttle_prompt",
+            "answer": "ok",
+            "source": {
+              "scene": "dungeon1",
+              "family": "npe_space_dungeon",
+              "room": "cave_entrance"
+            },
+            "expected": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            },
+            "timeout_seconds": 120
+          }
+        ]
+      }
+    }
+  ],
+  "review": {
+    "approved": true,
+    "recording": null,
+    "unsupported": []
+  }
+}

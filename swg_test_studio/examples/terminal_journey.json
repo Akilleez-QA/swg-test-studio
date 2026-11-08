@@ -1,19 +1,64 @@
 {
-  "format": "swg-test-studio", "schema_version": 1,
-  "id": "terminal_journey", "title": "Connected shuttle confirmations, authored arrivals and full save",
-  "category": "regression", "roles": ["actor"],
-  "steps": [{"id": "round_trip", "action": "journey", "options": {
-    "role": "actor", "prepare_start": true,
-    "actions": [
-      {"kind": "radial_dialog", "selector": "gamma_shuttle", "menu_type": 21,
-       "prompt": "@npe:gamma_shuttle_prompt", "answer": "ok", "timeout_seconds": 120,
-       "source": {"scene": "dungeon1", "family": "npe_space_station", "room": "hangarbay1"},
-       "expected": {"scene": "dungeon1", "family": "npe_space_dungeon", "room": "cave_entrance"}},
-      {"kind": "radial_dialog", "selector": "gamma_shuttle", "menu_type": 21,
-       "prompt": "@npe:gamma_shuttle_prompt", "answer": "ok", "timeout_seconds": 120,
-       "source": {"scene": "dungeon1", "family": "npe_space_dungeon", "room": "cave_entrance"},
-       "expected": {"scene": "dungeon1", "family": "npe_space_station", "room": "hangarbay1"}}
-    ]
-  }}],
-  "review": {"approved": true, "recording": null, "unsupported": []}
+  "format": "swg-test-studio",
+  "schema_version": 1,
+  "id": "terminal_journey",
+  "title": "Connected shuttle confirmations, authored arrivals and full save",
+  "category": "regression",
+  "roles": [
+    "actor"
+  ],
+  "steps": [
+    {
+      "id": "round_trip",
+      "action": "journey",
+      "options": {
+        "role": "actor",
+        "prepare_start": true,
+        "actions": [
+          {
+            "kind": "radial_dialog",
+            "selector": "gamma_shuttle",
+            "menu_type": 21,
+            "prompt": "@npe:gamma_shuttle_prompt",
+            "answer": "ok",
+            "timeout_seconds": 120,
+            "source": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            },
+            "expected": {
+              "scene": "dungeon1",
+              "family": "npe_space_dungeon",
+              "room": "cave_entrance"
+            }
+          },
+          {
+            "kind": "radial_dialog",
+            "selector": "gamma_shuttle",
+            "menu_type": 21,
+            "prompt": "@npe:gamma_shuttle_prompt",
+            "answer": "ok",
+            "timeout_seconds": 120,
+            "source": {
+              "scene": "dungeon1",
+              "family": "npe_space_dungeon",
+              "room": "cave_entrance"
+            },
+            "expected": {
+              "scene": "dungeon1",
+              "family": "npe_space_station",
+              "room": "hangarbay1"
+            }
+          }
+        ],
+        "prepare_between_actions": true
+      }
+    }
+  ],
+  "review": {
+    "approved": true,
+    "recording": null,
+    "unsupported": []
+  }
 }

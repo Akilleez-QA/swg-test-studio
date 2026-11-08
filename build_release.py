@@ -19,6 +19,7 @@ def main():
     with output.open("xb") as stream, zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for source in sources:
             info = zipfile.ZipInfo(source.relative_to(root).as_posix(), date_time=(2026, 11, 8, 0, 0, 0))
+            info.create_system = 3  # Stable ZIP metadata across Windows and Linux.
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o600 << 16
             archive.writestr(info, source.read_bytes())

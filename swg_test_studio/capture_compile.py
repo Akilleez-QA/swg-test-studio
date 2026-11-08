@@ -58,7 +58,7 @@ def convert(events):
                     expected = copy.deepcopy(pending["source"])
                     actions.append(make_action(pending, expected))
                     previous, pending = expected, None
-        elif kind == "scene_published":
+        elif kind in ("scene_published", "loading_completed"):
             try:
                 destination = station_state(data)
             except ValueError:

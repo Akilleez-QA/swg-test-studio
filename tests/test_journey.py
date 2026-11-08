@@ -28,6 +28,13 @@ def capture():
 
 
 class CompilerTests(unittest.TestCase):
+    def test_same_world_loading_completion_proves_the_authored_arrival(self):
+        records = capture()
+        records[3]["event"] = "loading_completed"
+        self.assertEqual(capture_compile.convert(records), capture_compile.convert(capture()))
+        records[3]["data"]["room"] = "wrong_room"
+        self.assertTrue(capture_compile.convert(records)[1])
+
     def test_complete_capture_generates_stable_action_without_runtime_ids(self):
         actions, problems = capture_compile.convert(capture())
         self.assertFalse(problems)
@@ -135,6 +142,9 @@ class Fixture:
         self.session = Session(self)
         self.terminal = dict(protocol_bot="terminal", target="99999", selector="gamma_shuttle", terminal_metadata="2", scene="dungeon1",
                              family="npe_space_station", cell="71", same_cell="true", distance="2")
+    def complete_arrival(self, session, query, expected, timeout):
+        self.loading_expected = copy.deepcopy(expected)
+        return {"readiness": {"scene": "terrain/dungeon1.trn"}}
     def row(self): return copy.deepcopy(self.before)
     def query(self, command):
         if command == "botTerminals": return copy.deepcopy(self.terminal)
@@ -144,9 +154,46 @@ class Fixture:
 
 
 class ReplayTests(unittest.TestCase):
+    def test_between_action_proximity_setup_is_explicit_and_source_bound(self):
+        from unittest.mock import Mock
+        fixture, engine = self.make()
+        data = options()
+        data["prepare_between_actions"] = True
+        engine.prepare, engine.position, engine.action = Mock(), Mock(), Mock()
+        source = dict(fixture.before, **data["actions"][1]["source"])
+        engine.row = Mock(return_value=source)
+        engine.run(data)
+        engine.prepare.assert_called_once_with(data["actions"][0]["source"])
+        engine.position.assert_called_once_with()
+        self.assertEqual(engine.action.call_count, 2)
+        for change in ({"family": "other"}, {"group": "123"}, {"combat": "1"}):
+            engine.position.reset_mock()
+            engine.row.return_value = dict(source, **change)
+            with self.subTest(change=change), self.assertRaises(RuntimeError): engine.run(data)
+            engine.position.assert_not_called()
+
+    def test_between_action_setup_is_not_inferred_and_types_are_strict(self):
+        from unittest.mock import Mock
+        fixture, engine = self.make()
+        data = options()
+        data.pop("prepare_between_actions", None)
+        engine.prepare, engine.position, engine.action = Mock(), Mock(), Mock()
+        engine.run(data)
+        engine.position.assert_not_called()
+        for value in (1, "true", None):
+            data["prepare_between_actions"] = value
+            from swg_test_studio.journey import validate
+            with self.subTest(value=value), self.assertRaises(ValueError): validate(data, ["actor"])
+
+    def test_confirmation_requires_the_matching_loading_adapter(self):
+        fixture, engine = self.make()
+        engine.complete_arrival = None
+        with self.assertRaises(RuntimeError): engine.action(fixture.action)
+        self.assertEqual(fixture.report["checks"], [])
+
     def make(self):
         fixture, clock = Fixture(), Clock()
-        return fixture, Journey(fixture, fixture.query, clock, clock.sleep)
+        return fixture, Journey(fixture, fixture.query, clock, clock.sleep, complete_arrival=fixture.complete_arrival)
 
     def test_replay_resolves_fresh_ids_and_uses_all_fresh_event_fences(self):
         fixture, engine = self.make()
@@ -154,7 +201,7 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(result["family"], "npe_space_dungeon")
         self.assertEqual(fixture.session.commands, ["menu 99999", "select 99999 21", "answer 777 ok"])
         self.assertTrue(all(stamp is not None for _, stamp in fixture.session.waits))
-        self.assertIn("scene_ready", [kind for kind, _ in fixture.session.waits])
+        self.assertEqual(fixture.loading_expected, fixture.action["expected"])
 
     def test_terminal_ambiguity_wrong_copy_cell_or_distance_sends_nothing(self):
         for change in ({"protocol_bot": "ambiguous-terminal"}, {"family": "other"}, {"cell": "999"},

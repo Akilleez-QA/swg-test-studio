@@ -18,6 +18,7 @@ class Studio:
         self.messages, self.process = queue.Queue(), None
         self.environment = tk.StringVar()
         self.recording = tk.StringVar()
+        self.capture_ranges = tk.StringVar()
         self.role = tk.StringVar(value="actor")
         self.status = tk.StringVar(value="Select an example or create a test. Live operations require a prepared fixture.")
         root.title("SWG Test Studio")
@@ -76,6 +77,10 @@ class Studio:
                                ("Stop", lambda: self.job("record-stop", "--recording", self.recording.get())),
                                ("Export draft", self.export_draft)):
             ttk.Button(row, text=text, command=callback).pack(side="left", padx=3)
+        row = ttk.Frame(recording)
+        row.pack(fill="x", pady=(0, 8))
+        ttk.Label(row, text="Optional clips (first:last, comma-separated; blank uses all events)").pack(side="left")
+        ttk.Entry(row, textvariable=self.capture_ranges).pack(side="left", fill="x", expand=True, padx=6)
         self.timeline = tk.Text(recording, wrap="none", font=("Consolas", 10), state="disabled")
         self.timeline.pack(fill="both", expand=True)
         ttk.Label(results, text="CLI events and evidence locations. A protocol pass does not establish Windows visual acceptance.").pack(anchor="w")
@@ -186,7 +191,10 @@ class Studio:
         self.job(command, suite["id"], "--environment", self.env())
 
     def export_draft(self):
-        self.job("record-draft", "--recording", self.recording.get(), "--id", "recorded_test", "--title", "Recorded gameplay — review required")
+        clips = [value.strip() for value in self.capture_ranges.get().split(",") if value.strip()]
+        extra = [item for value in clips for item in ("--range", value)]
+        self.job("record-draft", "--recording", self.recording.get(), "--id", "recorded_test",
+                 "--title", "Recorded gameplay - review required", *extra)
 
     def job(self, *args):
         if self.process is not None:
@@ -220,6 +228,8 @@ class Studio:
             self.output.configure(state="disabled")
             try:
                 value = json.loads(item)
+                if value.get("state") == "armed_waiting_for_server_events":
+                    self.capture_ranges.set("")
                 if "id" in value and len(str(value["id"])) == 32:
                     self.recording.set(value["id"])
                 if "events" in value or value.get("state") == "armed_waiting_for_server_events":

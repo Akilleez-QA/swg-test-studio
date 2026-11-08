@@ -56,7 +56,7 @@ def plan(suite, env):
             "effects": {"gameplay_actions": bool(bindings), "creates_dedicated_character": any(
                 c["kind"] == "protocol_session" and c["options"].get("create", False) for c in manifest["tests"]),
                 "explicit_station_setup": any(c["options"].get("stage_station", False) for c in manifest["tests"]),
-                "fixture_proximity_setup": any(c["options"].get("prepare_terminal", False) or c["options"].get("prepare_start", False) or c["kind"] not in ("protocol_session", "studio_journey")
+                "fixture_proximity_setup": any(c["options"].get("prepare_terminal", False) or c["options"].get("prepare_start", False) or c["options"].get("prepare_between_actions", False) or c["kind"] not in ("protocol_session", "studio_journey")
                                                for c in manifest["tests"] if c["kind"] != "driver_unit"),
                 "service_restart": False, "client_changed": False}}
 
