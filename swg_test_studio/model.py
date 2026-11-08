@@ -90,6 +90,9 @@ def validate(data, *, runnable=False):
                 raise ValueError("Creation, station setup and terminal travel are separate lifecycles")
             if options.get("prepare_terminal") and ("expect_family" not in options or options.get("answer", "ok") != "ok"):
                 raise ValueError("Shuttle recipe requires an explicit destination and confirmation")
+        elif step["action"] == "journey":
+            from .journey import validate as validate_journey
+            validate_journey(options, roles)
         elif step["action"] == "saved_suite":
             exact(options, ("suite", "bindings"), "saved-suite")
             recipe = options["suite"]
@@ -114,12 +117,14 @@ def validate(data, *, runnable=False):
 
 
 def compile_suite(data, legacy_dir):
-    """Translate to the existing schema without changing any bundled manifest."""
+    """Compile private execution cases; legacy recipes keep their original schema."""
     data = validate(data, runnable=True)
     cases = []
     for step in data["steps"]:
         if step["action"] == "session":
             cases.append({"id": step["id"], "kind": "protocol_session", "options": step["options"]})
+        elif step["action"] == "journey":
+            cases.append({"id": step["id"], "kind": "studio_journey", "options": step["options"]})
         else:
             options = step["options"]
             original = loads((legacy_dir / (options["suite"] + ".json")).read_text(encoding="utf-8"))

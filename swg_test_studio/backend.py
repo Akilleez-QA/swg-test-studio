@@ -56,7 +56,7 @@ def plan(suite, env):
             "effects": {"gameplay_actions": bool(bindings), "creates_dedicated_character": any(
                 c["kind"] == "protocol_session" and c["options"].get("create", False) for c in manifest["tests"]),
                 "explicit_station_setup": any(c["options"].get("stage_station", False) for c in manifest["tests"]),
-                "fixture_proximity_setup": any(c["options"].get("prepare_terminal", False) or c["kind"] != "protocol_session"
+                "fixture_proximity_setup": any(c["options"].get("prepare_terminal", False) or c["options"].get("prepare_start", False) or c["kind"] not in ("protocol_session", "studio_journey")
                                                for c in manifest["tests"] if c["kind"] != "driver_unit"),
                 "service_restart": False, "client_changed": False}}
 
@@ -90,7 +90,10 @@ def studio_lock(workspace):
 def run_suite(suite, env, workspace, emit=print):
     selected = plan(suite, env)
     driver, legacy = driver_modules(env)
-    manifest = legacy.validate(selected["manifest"])
+    manifest = selected["manifest"]
+    ordinary = dict(manifest, tests=[c for c in manifest["tests"] if c["kind"] != "studio_journey"])
+    if ordinary["tests"]:
+        legacy.validate(ordinary)
     operation = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
     output = Path(workspace) / "runs" / operation
     with studio_lock(workspace):
@@ -107,18 +110,29 @@ def run_suite(suite, env, workspace, emit=print):
                                          for p in Path(__file__).parent.glob("*.py")}}
         try:
             report["source_hashes"] = legacy.source_hashes()
+            root = Path(env["server_checkout"])
+            report["studio_adapter_sha256"] = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
+                "devtools/teststudio_server/retained_peer.py",
+                "src/engine/server/library/serverGame/src/shared/core/TestStudioRecorder.h",
+                "src/engine/server/library/serverGame/src/shared/core/TestStudioCapture.h") if (root / name).is_file()}
             for case in manifest["tests"]:
                 started = time.monotonic()
                 row = {"id": case["id"], "kind": case["kind"], "passed": False}
                 report["cases"].append(row)
                 emit({"event": "case_started", "id": case["id"], "operation": operation})
                 try:
-                    argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
-                    with (output / (case["id"] + ".log")).open("x") as log:
-                        code, timed_out = legacy.execute(argv, log, timeout=2400)
-                    row.update(exit_code=code, timed_out=timed_out, passed=code == 0 and not timed_out)
-                    if row["passed"] and case["kind"] != "driver_unit":
-                        row["artifact"] = legacy.runtime_artifact(output / (case["id"] + ".log"), Path(env["folder"]))
+                    if case["kind"] == "studio_journey":
+                        from .journey import run_live
+                        with (output / (case["id"] + ".log")).open("x") as log, contextlib.redirect_stdout(log):
+                            row["artifact"] = run_live(case["options"], env, selected["bindings"][case["options"]["role"]])
+                        row.update(exit_code=0, timed_out=False, passed=True)
+                    else:
+                        argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
+                        with (output / (case["id"] + ".log")).open("x") as log:
+                            code, timed_out = legacy.execute(argv, log, timeout=2400)
+                        row.update(exit_code=code, timed_out=timed_out, passed=code == 0 and not timed_out)
+                        if row["passed"] and case["kind"] != "driver_unit":
+                            row["artifact"] = legacy.runtime_artifact(output / (case["id"] + ".log"), Path(env["folder"]))
                 except (Exception, KeyboardInterrupt) as exc:
                     row.update(passed=False, error=type(exc).__name__ + ": " + str(exc))
                 row["seconds"] = time.monotonic() - started

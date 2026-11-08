@@ -69,14 +69,14 @@ def start(env, workspace, role, seconds=600):
             write_json(path, meta, replace=True)
             raise
         return {"id": token, "state": "armed_waiting_for_server_events", "expires": expiry,
-                "character": bot["character"], "role": role}
+                "account": bot["account"], "character": bot["character"], "role": role}
 
 
 def load(workspace, token):
     token = session_id(token)
     path = Path(workspace) / "recordings" / (token + ".json")
     meta = read_json(path)
-    if meta.get("schema_version") != 1 or meta.get("id") != token:
+    if type(meta.get("schema_version")) is not int or meta["schema_version"] != 1 or meta.get("id") != token:
         raise ValueError("Recording metadata identity changed")
     env = validate_environment(meta["environment"])
     return path, meta, root_for(env)
@@ -99,7 +99,7 @@ def status(workspace, token):
                 break
             event = loads(line.decode("utf-8"))
             if (set(event) != {"schema_version", "sequence", "session", "actor", "event", "time", "data"} or
-                    event["schema_version"] != 1 or type(event["sequence"]) is not int or event["sequence"] != index + 1 or
+                    type(event["schema_version"]) is not int or event["schema_version"] != 1 or type(event["sequence"]) is not int or event["sequence"] != index + 1 or
                     event["session"] != token or event["actor"] not in meta["actors"] or
                     not isinstance(event["data"], dict) or not isinstance(event["event"], str)):
                 raise ValueError("Recording event gap, identity or schema mismatch")
@@ -107,9 +107,12 @@ def status(workspace, token):
             if event["event"] == "overflow" or len(events) > 4096:
                 errors.append("Recording event limit exceeded")
                 break
+    from .capture_compile import convert
+    actions, unsupported = convert(events)
     return {"id": token, "state": meta["state"], "expired": time.time() >= meta["expires"],
             "events": events, "errors": errors, "replayable": False,
-            "notice": "Map observations to supported recipes and explicit expected results before replay"}
+            "supported_actions": len(actions), "unsupported": unsupported,
+            "notice": "Export supported actions, review the observed expectations and approve the draft before replay"}
 
 
 def finish_writers(events):
@@ -146,10 +149,17 @@ def draft(workspace, token, name, title):
     capture = status(workspace, token)
     if capture["state"] != "stopped" or capture["errors"] or not capture["events"]:
         raise ValueError("Stop a nonempty, complete recording before exporting")
-    steps = [{"id": "observe_" + str(e["sequence"]), "action": "recorded_observation",
+    from .capture_compile import convert
+    actions, unsupported = convert(capture["events"])
+    roles = [v["role"] for v in meta["actors"].values()]
+    if actions and len(roles) == 1:
+        steps = [{"id": "recorded_journey", "action": "journey", "options": {
+            "role": roles[0], "prepare_start": True, "actions": actions}}]
+    else:
+        steps = [{"id": "observe_" + str(e["sequence"]), "action": "recorded_observation",
               "options": {"summary": e["event"] + ": " + str(e["data"].get("scene", "unknown scene"))}}
-             for e in capture["events"][:32]]
+                 for e in capture["events"][:32]]
     return {"format": FORMAT, "schema_version": 1, "id": name, "title": title,
-            "category": "regression", "roles": [v["role"] for v in meta["actors"].values()], "steps": steps,
+            "category": "regression", "roles": roles, "steps": steps,
             "review": {"approved": False, "recording": token,
-                       "unsupported": ["Map observations to supported driver recipes; review every expected outcome"]}}
+                       "unsupported": unsupported}}

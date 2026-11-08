@@ -60,9 +60,9 @@ class Studio:
         self.editor.pack(fill="both", expand=True, pady=8)
         row = ttk.Frame(editor)
         row.pack(fill="x")
-        for text, callback in (("Validate", self.validate), ("Save", self.save), ("Preview run", self.preview), ("Run", self.run)):
+        for text, callback in (("Validate", self.validate), ("Approve reviewed expectations", self.approve), ("Save", self.save), ("Preview run", self.preview), ("Run", self.run)):
             ttk.Button(row, text=text, command=callback).pack(side="left", padx=(0, 6))
-        ttk.Label(recording, wraplength=950, text="Record uses opt-in server hooks and a dedicated test character. The Windows client stays unchanged. Captured observations export as a draft; map them to supported recipes and expected results before replay.").pack(anchor="w", pady=(0, 12))
+        ttk.Label(recording, wraplength=950, text="Record uses opt-in server hooks and a dedicated character in the unchanged Windows client. Start beside Tansaari's or Gamma's shuttle and stay still. Completed terminal interactions become a test draft. Review its expected outcomes, stop recording and log the character out before Run. Unsupported actions remain blocked.").pack(anchor="w", pady=(0, 12))
         row = ttk.Frame(recording)
         row.pack(fill="x")
         ttk.Label(row, text="Role").pack(side="left")
@@ -116,6 +116,17 @@ class Studio:
         def action():
             validate(self.current(), runnable=True)
             self.status.set("Valid supported suite. Preview checks environment bindings before Run.")
+        self.guarded(action)
+
+    def approve(self):
+        def action():
+            suite = self.current()
+            if suite["review"]["unsupported"]:
+                raise ValueError("Resolve the listed unsupported actions before approval")
+            suite["review"]["approved"] = True
+            validate(suite, runnable=True)
+            self.set_editor(suite)
+            self.status.set("Expectations marked reviewed. Save, then preview the explicit setup and run.")
         self.guarded(action)
 
     def save(self):
@@ -211,7 +222,7 @@ class Studio:
                 value = json.loads(item)
                 if "id" in value and len(str(value["id"])) == 32:
                     self.recording.set(value["id"])
-                if "events" in value:
+                if "events" in value or value.get("state") == "armed_waiting_for_server_events":
                     self.timeline.configure(state="normal")
                     self.timeline.delete("1.0", "end")
                     self.timeline.insert("1.0", json.dumps(value, indent=2))
