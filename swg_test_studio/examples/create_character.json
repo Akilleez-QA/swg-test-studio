@@ -1,0 +1,10 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "create_character", "title": "Explicit dedicated character creation and first login",
+  "category": "functional", "roles": ["actor"],
+  "steps": [
+    {"id": "create_login", "action": "session", "options": {"role": "actor", "create": true}},
+    {"id": "repeat_login", "action": "session", "options": {"role": "actor"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

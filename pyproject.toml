@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swg-test-studio"
+version = "0.1.0"
+description = "Local SWG test authoring, existing ELF64 driver execution, and fixture recording"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+swg-tests = "swg_test_studio.cli:main"
+
+[tool.setuptools.package-data]
+swg_test_studio = ["examples/*.json"]
+
+[tool.setuptools.packages.find]
+include = ["swg_test_studio*"]

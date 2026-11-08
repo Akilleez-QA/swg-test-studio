@@ -1,0 +1,10 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "gamma_shuttle", "title": "Tansaari–Gamma shuttle round trip and exact saved hangar",
+  "category": "regression", "roles": ["actor"],
+  "steps": [
+    {"id": "gamma_entry", "action": "session", "options": {"role": "actor", "prepare_terminal": true, "expect_family": "npe_space_dungeon"}},
+    {"id": "station_return", "action": "session", "options": {"role": "actor", "prepare_terminal": true, "expect_family": "npe_space_station"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

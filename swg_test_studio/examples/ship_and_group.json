@@ -1,0 +1,9 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "ship_and_group", "title": "Original ships, group affinity, launch and landing",
+  "category": "system", "roles": ["leader", "member"],
+  "steps": [
+    {"id": "ships", "action": "saved_suite", "options": {"suite": "ship_group", "bindings": {"leader": "leader", "member": "member"}}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

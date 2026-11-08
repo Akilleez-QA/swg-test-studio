@@ -1,0 +1,10 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "login_relogin", "title": "Login, full logout/save, then login again",
+  "category": "regression", "roles": ["actor"],
+  "steps": [
+    {"id": "first_login", "action": "session", "options": {"role": "actor"}},
+    {"id": "repeat_login", "action": "session", "options": {"role": "actor"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

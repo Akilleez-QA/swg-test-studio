@@ -1,0 +1,9 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "driver_guards", "title": "Existing driver isolation and lifecycle unit regressions",
+  "category": "unit", "roles": [],
+  "steps": [
+    {"id": "guards", "action": "saved_suite", "options": {"suite": "driver_unit", "bindings": {}}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

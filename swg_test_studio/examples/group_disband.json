@@ -1,0 +1,9 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "group_disband", "title": "Disband, solo independence and replacement-group affinity",
+  "category": "regression", "roles": ["leader", "member", "newleader"],
+  "steps": [
+    {"id": "groups", "action": "saved_suite", "options": {"suite": "stage7_group_disband", "bindings": {"leader": "leader", "member": "member", "newleader": "newleader"}}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}
