@@ -1,10 +1,13 @@
 """Docker operations restricted to a registered SWG test server."""
 import contextlib
+import hashlib
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import time
 
 from .setup import available_setups, checked_setup
@@ -93,12 +96,64 @@ def wait_for_login(rows, project):
     since = docker("inspect", "--format", "{{.State.StartedAt}}", login).strip()
     pattern = re.compile(r"Cluster " + re.escape(project) + r" is (ready|not ready) for players\.")
     deadline = time.monotonic() + 240
+    retried = False
     while time.monotonic() < deadline:
+        if docker("inspect", "--format", "{{.State.Running}}", login).strip() != "true":
+            if retried:
+                raise ValueError("The Docker test server’s login service stopped during startup.")
+            time.sleep(5)
+            docker("start", login)
+            since = docker("inspect", "--format", "{{.State.StartedAt}}", login).strip()
+            retried = True
         states = pattern.findall(docker("logs", "--since", since, login))
         if states and states[-1] == "ready":
             return
         time.sleep(3)
     raise ValueError("The Docker test server started, but login did not become ready in four minutes.")
+
+
+def prepare_restart(driver, folder, rows, stage):
+    # Reuse the server's normal stopped-generation fence for this private copy.
+    from fixture_journal_maintenance import ACK, command
+    from prepare_stage5_client_fixture64 import state_definitions
+
+    if stage.get("existing_journals_only") is not True:
+        raise ValueError("This stopped server needs the SWG test server’s existing-journal setup before Studio can start it.")
+    overlay = Path(stage["overlay"]).resolve(strict=True)
+    if (overlay.parts[:2] != ("/", "tmp") or
+            not re.fullmatch(r"[a-f0-9]{64}", stage.get("overlay_manifest_sha256", "")) or
+            hashlib.sha256((overlay / "manifest.json").read_bytes()).hexdigest() != stage["overlay_manifest_sha256"]):
+        raise ValueError("The saved Docker test server build no longer matches its preparation.")
+    image = rows["central"]["Config"]["Image"]
+    if (not re.fullmatch(r"starwarsgalaxies/central:[A-Za-z0-9_.-]+", image) or
+            docker("image", "inspect", "--format", "{{.Id}}", image).strip() != rows["central"]["Image"]):
+        raise ValueError("The test server’s pinned Central image is unavailable.")
+    definitions = state_definitions(stage["policy"])
+    for journal, option in ACK.items():
+        argv = command(folder / "runtime", journal, option,
+                       definitions if journal.endswith("/instances") else [], overlay, image)
+        docker(*argv[1:], timeout=90)
+
+
+def wait_for_preload(driver, folder):
+    verifier = driver.REPO / "devtools/zones/inspect_client_fixture.py"
+    deadline = time.monotonic() + 300
+    with tempfile.TemporaryDirectory(prefix="swg-studio-ready-") as directory:
+        for attempt in range(60):
+            if time.monotonic() >= deadline:
+                break
+            output = Path(directory) / f"ready-{attempt}.json"
+            try:
+                result = subprocess.run(
+                    [sys.executable, str(verifier), "--folder", str(folder), "--output", str(output),
+                     "--stage5", "--expected-instances", "1"],
+                    stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired:
+                continue
+            if result.returncode == 0 and output.is_file() and read_json(output).get("ready") is True:
+                return
+            time.sleep(5)
+    raise ValueError("The Docker test server logged in, but its game worlds did not finish loading.")
 
 
 def stop_started(rows, started):
@@ -118,18 +173,23 @@ def active_server(env, *, keep_running, emit):
     lock = driver.REPO / "StarWarsGalaxies"
     started = []
     with driver.operation_lock(lock):
-        _, _, rows, state, _, _ = container_set(env)
+        _, _, rows, state, stage, _ = container_set(env)
         project = folder.parent.name
         emit({"event": "test_server", "state": state, "project": project})
         if state == "Stopped":
             try:
+                emit({"event": "test_server", "state": "Preparing", "project": project})
+                prepare_restart(driver, folder, rows, stage)
                 # Role containers were fully identified above. No Compose recreation or image pull.
                 for role in ("log", "taskmanager", "database", "chat", "local_chat", "planet", "game",
-                             "connection", "login", "metrics", "commodities", "central"):
+                             "connection", "metrics", "commodities", "central", "login"):
                     started.append(role)
                     docker("start", rows[role]["Id"])
+                emit({"event": "test_server", "state": "Loading", "project": project})
                 wait_for_login(rows, project)
                 driver.fixture(folder)
+                wait_for_preload(driver, folder)
+                emit({"event": "test_server", "state": "Ready", "project": project})
             except BaseException:
                 stop_started(rows, started)
                 raise

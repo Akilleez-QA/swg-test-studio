@@ -46,13 +46,14 @@ class SetupTests(unittest.TestCase):
         driver = SimpleNamespace(REPO=Path("/source"), operation_lock=lambda _: contextlib.nullcontext(),
                                  fixture=lambda _: None)
         roles = ("log", "taskmanager", "database", "chat", "local_chat", "planet", "game",
-                 "connection", "login", "metrics", "commodities", "central", "oracle")
+                 "connection", "metrics", "commodities", "central", "login", "oracle")
         rows = {role: {"Id": role} for role in roles}
         info = (driver, Path("/tmp/test/client"), rows, "Stopped", {}, {})
         for keep_running in (False, True):
             with patch.object(docker_runtime, "require_docker"), \
                     patch.object(docker_runtime, "container_set", return_value=info), \
-                    patch.object(docker_runtime, "wait_for_login"), patch.object(docker_runtime, "docker") as docker:
+                    patch.object(docker_runtime, "prepare_restart"), patch.object(docker_runtime, "wait_for_login"), \
+                    patch.object(docker_runtime, "wait_for_preload"), patch.object(docker_runtime, "docker") as docker:
                 with docker_runtime.active_server({}, keep_running=keep_running, emit=lambda _: None):
                     pass
                 starts = [call.args[1] for call in docker.call_args_list if call.args[0] == "start"]
