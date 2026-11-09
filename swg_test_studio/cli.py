@@ -55,7 +55,7 @@ def main(argv=None):
     commands.add_parser("environment-template", help="Print an editable environment example (contains no credentials)")
     child = commands.add_parser("record-start")
     child.add_argument("--environment", type=Path, required=True)
-    child.add_argument("--role", required=True)
+    child.add_argument("--role", action="append", required=True)
     child.add_argument("--seconds", type=int, default=600)
     for action in ("record-status", "record-stop", "record-draft"):
         child = commands.add_parser(action)

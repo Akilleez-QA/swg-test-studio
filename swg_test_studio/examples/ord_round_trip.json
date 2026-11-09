@@ -1,0 +1,36 @@
+{
+  "format": "swg-test-studio",
+  "schema_version": 1,
+  "id": "ord_round_trip",
+  "title": "Recorded Ord launch and landing",
+  "category": "regression",
+  "roles": [
+    "pilot"
+  ],
+  "steps": [
+    {
+      "id": "recorded_journey",
+      "action": "action_sequence",
+      "options": {
+        "roles": [
+          "pilot"
+        ],
+        "actions": [
+          {
+            "kind": "launch",
+            "actor": "pilot"
+          },
+          {
+            "kind": "land",
+            "actor": "pilot"
+          }
+        ]
+      }
+    }
+  ],
+  "review": {
+    "approved": true,
+    "recording": null,
+    "unsupported": []
+  }
+}

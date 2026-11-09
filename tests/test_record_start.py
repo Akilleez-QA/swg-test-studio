@@ -45,6 +45,28 @@ class RecordingStartTests(unittest.TestCase):
             self.assertFalse((self.folder/'fixture/teststudio/123.control').exists())
             self.mounts[1].clear();self.mounts[1].update(original)
 
+    def test_two_role_recording_uses_one_session_and_checks_both_controls_before_stop(self):
+        profile = self.folder / "runtime/stage5-report.json"
+        self.env["bindings"]["member"] = "gamma"
+        bot = dict(schema_version=1, account="capbot_777abcd", character="Capmnopqrstuvwx",
+                   player="456", station="43")
+        (self.folder / "protocol-driver/gamma.json").write_text(json.dumps(bot))
+        workspace = Path(self.temporary.name) / "workspace"
+        with self.assertRaisesRegex(ValueError, "matching action-capture"):
+            recording.start(self.env, workspace, ["actor", "member"], 60)
+        profile.write_text(json.dumps(dict(test_studio_recording=True, test_studio_action_capture=1)))
+        armed = recording.start(self.env, workspace, ["actor", "member"], 60)
+        self.assertEqual([row["role"] for row in armed["actors"]], ["actor", "member"])
+        controls = self.folder / "fixture/teststudio"
+        self.assertIn(armed["id"], (controls / "123.control").read_text())
+        self.assertIn(armed["id"], (controls / "456.control").read_text())
+        (controls / "456.control").write_text("different owner")
+        with patch.object(recording, "validate_environment", side_effect=lambda value: value):
+            with self.assertRaisesRegex(ValueError, "ownership changed"):
+                recording.stop(workspace, armed["id"])
+        self.assertTrue((controls / "123.control").is_file())
+        self.assertEqual((controls / "456.control").read_text(), "different owner")
+
     def test_profile_or_game_role_flag_must_be_explicit(self):
         profile=self.folder/'runtime/stage5-report.json';profile.write_text('{}')
         with self.assertRaises(ValueError):recording.start(self.env,Path(self.temporary.name)/'workspace','actor',60)

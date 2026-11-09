@@ -35,6 +35,14 @@ class CompilerTests(unittest.TestCase):
         records[3]["data"]["room"] = "wrong_room"
         self.assertTrue(capture_compile.convert(records)[1])
 
+    def test_applied_teleport_requires_an_approved_shuttle_and_arrival(self):
+        records = capture()
+        teleport = dict(records[-1], event="teleport_applied")
+        self.assertEqual(capture_compile.convert(records[:-1] + [teleport, records[-1]]),
+                         capture_compile.convert(records))
+        self.assertTrue(capture_compile.convert(records[:-1] + [teleport])[1])
+        self.assertTrue(capture_compile.convert([teleport] + records)[1])
+
     def test_complete_capture_generates_stable_action_without_runtime_ids(self):
         actions, problems = capture_compile.convert(capture())
         self.assertFalse(problems)

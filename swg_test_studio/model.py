@@ -99,6 +99,9 @@ def validate(data, *, runnable=False):
         elif step["action"] == "journey":
             from .journey import validate as validate_journey
             validate_journey(options, roles)
+        elif step["action"] == "action_sequence":
+            from .action_sequence import validate as validate_sequence
+            validate_sequence(options, roles)
         elif step["action"] == "saved_suite":
             exact(options, ("suite", "bindings"), "saved-suite")
             recipe = options["suite"]
@@ -131,6 +134,8 @@ def compile_suite(data, legacy_dir):
             cases.append({"id": step["id"], "kind": "protocol_session", "options": step["options"]})
         elif step["action"] == "journey":
             cases.append({"id": step["id"], "kind": "studio_journey", "options": step["options"]})
+        elif step["action"] == "action_sequence":
+            cases.append({"id": step["id"], "kind": "studio_action_sequence", "options": step["options"]})
         else:
             options = step["options"]
             original = loads((legacy_dir / (options["suite"] + ".json")).read_text(encoding="utf-8"))

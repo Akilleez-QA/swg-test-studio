@@ -68,7 +68,7 @@ class Studio:
         row.pack(fill="x")
         ttk.Label(row, text="Role").pack(side="left")
         ttk.Entry(row, textvariable=self.role, width=18).pack(side="left", padx=6)
-        ttk.Button(row, text="Start recording", command=lambda: self.job("record-start", "--environment", self.env(), "--role", self.role.get())).pack(side="left")
+        ttk.Button(row, text="Start recording", command=self.start_recording).pack(side="left")
         row = ttk.Frame(recording)
         row.pack(fill="x", pady=10)
         ttk.Label(row, text="Recording ID").pack(side="left")
@@ -189,6 +189,12 @@ class Studio:
             raise ValueError("Save your test before previewing or running it")
         self.tabs.select(3)
         self.job(command, suite["id"], "--environment", self.env())
+
+    def start_recording(self):
+        arguments = ["record-start", "--environment", self.env()]
+        for role in self.role.get().split(","):
+            arguments.extend(("--role", role.strip()))
+        self.job(*arguments)
 
     def export_draft(self):
         clips = [value.strip() for value in self.capture_ranges.get().split(",") if value.strip()]

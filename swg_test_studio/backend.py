@@ -51,13 +51,26 @@ def plan(suite, env):
     if set(bindings) != set(suite["roles"]):
         raise ValueError("Bind every declared role in the environment")
     manifest = compile_suite(suite, local_path(env["server_checkout"]) / "devtools/zones/test_sets")
+    cases = manifest["tests"]
+    action_kinds = {
+        action["kind"]
+        for case in cases if case["kind"] == "studio_action_sequence"
+        for action in case["options"]["actions"]
+    }
+    ground_or_legacy_setup = any(
+        any(case["options"].get(key, False) for key in
+            ("prepare_terminal", "prepare_start", "prepare_between_actions")) or
+        case["kind"] not in ("protocol_session", "studio_journey", "studio_action_sequence")
+        for case in cases if case["kind"] != "driver_unit"
+    )
     return {"schema_version": 1, "suite": suite["id"], "environment": env["name"],
             "bindings": bindings, "manifest": manifest,
             "effects": {"gameplay_actions": bool(bindings), "creates_dedicated_character": any(
-                c["kind"] == "protocol_session" and c["options"].get("create", False) for c in manifest["tests"]),
-                "explicit_station_setup": any(c["options"].get("stage_station", False) for c in manifest["tests"]),
-                "fixture_proximity_setup": any(c["options"].get("prepare_terminal", False) or c["options"].get("prepare_start", False) or c["options"].get("prepare_between_actions", False) or c["kind"] not in ("protocol_session", "studio_journey")
-                                               for c in manifest["tests"] if c["kind"] != "driver_unit"),
+                case["kind"] == "protocol_session" and case["options"].get("create", False) for case in cases),
+                "explicit_station_setup": any(case["options"].get("stage_station", False) for case in cases),
+                "fixture_proximity_setup": ground_or_legacy_setup or bool(action_kinds & {"launch", "land"}),
+                "ship_pilot_reward_and_proximity_setup": "launch" in action_kinds,
+                "group_cleanup_possible": "form_group" in action_kinds,
                 "service_restart": False, "client_changed": False}}
 
 
@@ -91,7 +104,7 @@ def run_suite(suite, env, workspace, emit=print):
     selected = plan(suite, env)
     driver, legacy = driver_modules(env)
     manifest = selected["manifest"]
-    ordinary = dict(manifest, tests=[c for c in manifest["tests"] if c["kind"] != "studio_journey"])
+    ordinary = dict(manifest, tests=[c for c in manifest["tests"] if c["kind"] not in ("studio_journey", "studio_action_sequence")])
     if ordinary["tests"]:
         legacy.validate(ordinary)
     operation = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
@@ -127,7 +140,11 @@ def run_suite(suite, env, workspace, emit=print):
                             row["artifact"] = run_live(case["options"], env, selected["bindings"][case["options"]["role"]])
                         row.update(exit_code=0, timed_out=False, passed=True)
                     else:
-                        argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
+                        if case["kind"] == "studio_action_sequence":
+                            from .action_sequence import command
+                            argv = command(case["options"], env, selected["bindings"], output, case["id"])
+                        else:
+                            argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
                         with (output / (case["id"] + ".log")).open("x") as log:
                             code, timed_out = legacy.execute(argv, log, timeout=2400)
                         row.update(exit_code=code, timed_out=timed_out, passed=code == 0 and not timed_out)

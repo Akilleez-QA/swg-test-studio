@@ -1,0 +1,60 @@
+{
+  "format": "swg-test-studio",
+  "schema_version": 1,
+  "id": "ord_group_sequence",
+  "title": "Ord launch, landing and group leadership",
+  "category": "regression",
+  "roles": [
+    "pilot",
+    "member"
+  ],
+  "steps": [
+    {
+      "id": "ord_round_trip",
+      "action": "action_sequence",
+      "options": {
+        "roles": [
+          "pilot",
+          "member"
+        ],
+        "actions": [
+          {
+            "kind": "form_group",
+            "actor": "pilot",
+            "peer": "member"
+          },
+          {
+            "kind": "promote",
+            "actor": "pilot",
+            "peer": "member"
+          },
+          {
+            "kind": "launch",
+            "actor": "member"
+          },
+          {
+            "kind": "launch",
+            "actor": "pilot"
+          },
+          {
+            "kind": "land",
+            "actor": "pilot"
+          },
+          {
+            "kind": "land",
+            "actor": "member"
+          },
+          {
+            "kind": "disband",
+            "actor": "member"
+          }
+        ]
+      }
+    }
+  ],
+  "review": {
+    "approved": true,
+    "recording": null,
+    "unsupported": []
+  }
+}

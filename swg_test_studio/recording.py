@@ -24,20 +24,26 @@ def root_for(env):
 
 
 def start(env, workspace, role, seconds=600):
-    if role not in env["bindings"] or type(seconds) is not int or not 30 <= seconds <= 3600:
-        raise ValueError("Select a bound role and duration of 30–3600 seconds")
+    roles = [role] if isinstance(role, str) else role
+    if (not isinstance(roles, list) or not 1 <= len(roles) <= 2 or
+            any(not isinstance(key, str) or key not in env["bindings"] for key in roles) or
+            len(set(roles)) != len(roles) or type(seconds) is not int or not 30 <= seconds <= 3600):
+        raise ValueError("Select one or two distinct bound roles and duration of 30–3600 seconds")
     driver, _ = driver_modules(env)
     with studio_lock(workspace), driver.operation_lock(driver.REPO / "StarWarsGalaxies"):
         project, schema, services = driver.fixture(Path(env["folder"]))
         root = root_for(env)
         mount = next((m for m in services["game"]["Mounts"] if m["Destination"] == "/fixture"), None)
         capture_mount = next((m for m in services["game"]["Mounts"] if m["Destination"] == "/teststudio-capture"), None)
-        if (not mount or Path(mount["Source"]).resolve() != Path(env["folder"]) / "fixture" or
+        if (not mount or mount.get("RW") is not False or
+                Path(mount["Source"]).resolve() != Path(env["folder"]) / "fixture" or
                 not capture_mount or Path(capture_mount["Source"]).resolve() != root or not capture_mount.get("RW")):
             raise ValueError("Recording requires the exact dedicated writable capture mount")
         profile = read_json(Path(env["folder"]) / "runtime/stage5-report.json")
         if profile.get("test_studio_recording") is not True:
             raise ValueError("Prepare the fixture with the explicit --test-studio-recording option")
+        if len(roles) > 1 and profile.get("test_studio_action_capture") != 1:
+            raise ValueError("Two-role recording requires the matching action-capture server build")
         section, enabled = "", None
         for raw in (Path(env["folder"]) / "runtime/config/game.cfg").read_text().splitlines():
             line = raw.strip()
@@ -49,10 +55,16 @@ def start(env, workspace, role, seconds=600):
                     enabled = value.strip()
         if enabled not in ("true", "1"):
             raise ValueError("Recorder disabled: install the matched server build and explicitly enable testStudioRecorder in this fixture")
-        registry = Path(env["folder"]) / "protocol-driver" / (env["bindings"][role] + ".json")
-        bot = driver.identity(read_json(registry))
-        if "player" not in bot or "station" not in bot:
-            raise ValueError("Recording requires an existing fully registered test character")
+        bots = {}
+        for key in roles:
+            registry = Path(env["folder"]) / "protocol-driver" / (env["bindings"][key] + ".json")
+            bot = driver.identity(read_json(registry))
+            if "player" not in bot or "station" not in bot:
+                raise ValueError("Recording requires existing fully registered test characters")
+            bots[key] = bot
+        for field in ("player", "account", "station"):
+            if len({bot[field] for bot in bots.values()}) != len(roles):
+                raise ValueError("Recording roles must bind distinct characters and accounts")
         root.mkdir(mode=0o700, exist_ok=True)
         if any(root.glob("*.control")):
             raise ValueError("Stop the existing recording first; expired controls require explicit Stop")
@@ -62,23 +74,39 @@ def start(env, workspace, role, seconds=600):
         # worker runs under a different container UID.
         with (root / token / "events.jsonl").open("x", encoding="utf-8") as events:
             os.chmod(events.name, 0o600)
-        control = f"SWGTS1 {token} {expiry} {bot['station']} {bot['character']}\n"
+        controls = {
+            bot["player"]: f"SWGTS1 {token} {expiry} {bot['station']} {bot['character']}\n"
+            for bot in bots.values()
+        }
+        actors = {
+            bot["player"]: {"role": key, "station": bot["station"], "character": bot["character"]}
+            for key, bot in bots.items()
+        }
         meta = {"schema_version": 1, "id": token, "state": "recording", "expires": expiry,
                 "environment": env, "project": project, "schema": schema,
-                "actors": {bot["player"]: {"role": role, "station": bot["station"], "character": bot["character"]}},
-                "controls": {bot["player"]: control}, "started": int(time.time())}
+                "actors": actors, "controls": controls, "started": int(time.time())}
         path = Path(workspace) / "recordings" / (token + ".json")
         write_json(path, meta)
+        created = []
         try:
-            with (root / (bot["player"] + ".control")).open("x", encoding="ascii") as output:
-                os.chmod(output.name, 0o600)
-                output.write(control)
+            for player, control in controls.items():
+                control_path = root / (player + ".control")
+                with control_path.open("x", encoding="ascii") as output:
+                    created.append(control_path)
+                    os.chmod(output.name, 0o600)
+                    output.write(control)
         except Exception:
+            for control_path in created:
+                control_path.unlink(missing_ok=True)
             meta["state"] = "failed"
             write_json(path, meta, replace=True)
             raise
-        return {"id": token, "state": "armed_waiting_for_server_events", "expires": expiry,
-                "account": bot["account"], "character": bot["character"], "role": role}
+        roster = [{"role": key, "account": bot["account"], "character": bot["character"]}
+                  for key, bot in bots.items()]
+        armed = {"id": token, "state": "armed_waiting_for_server_events", "expires": expiry, "actors": roster}
+        if len(roster) == 1:
+            armed.update(roster[0])
+        return armed
 
 
 def load(workspace, token):
@@ -116,8 +144,8 @@ def status(workspace, token):
             if event["event"] == "overflow" or len(events) > 4096:
                 errors.append("Recording event limit exceeded")
                 break
-    from .capture_compile import convert
-    actions, unsupported = convert(events)
+    _, options, unsupported = compile_actions(events, meta["actors"])
+    actions = options["actions"]
     return {"id": token, "state": meta["state"], "expired": time.time() >= meta["expires"],
             "events": events, "errors": errors, "replayable": False,
             "supported_actions": len(actions), "unsupported": unsupported,
@@ -137,6 +165,7 @@ def finish_writers(events):
 def stop(workspace, token):
     with studio_lock(workspace):
         path, meta, root = load(workspace, token)
+        owned_controls = []
         for actor, expected in meta["controls"].items():
             if not re.fullmatch(r"[1-9][0-9]{0,18}", actor):
                 raise ValueError("Invalid recorded actor")
@@ -144,12 +173,29 @@ def stop(workspace, token):
             if control.exists():
                 if control.is_symlink() or control.read_text(encoding="ascii") != expected or token not in expected:
                     raise ValueError("Recording control ownership changed; refusing removal")
-                control.unlink()
+                owned_controls.append(control)
+        for control in owned_controls:
+            control.unlink()
         meta["state"], meta["stopped"] = "stopped", int(time.time())
         # Fence any writer that already acquired its append lock before Stop.
         finish_writers(root / token / "events.jsonl")
         write_json(path, meta, replace=True)
     return status(workspace, token)
+
+
+def compile_actions(events, actors):
+    from .capture_compile import convert
+    from .sequence_capture import applies, convert as convert_sequence
+
+    if applies(events):
+        options, problems = convert_sequence(events, actors)
+        return "action_sequence", options, problems
+    actions, problems = convert(events)
+    participants = {event["actor"] for event in events if "actor" in event}
+    if len(participants) > 1 or (not participants and len(actors) != 1):
+        problems.append("A shuttle clip requires one recorded role")
+    role = next(value["role"] for key, value in actors.items() if not participants or key in participants)
+    return "journey", {"role": role, "prepare_start": True, "actions": actions}, problems
 
 
 def draft(workspace, token, name, title, ranges=None):
@@ -158,7 +204,6 @@ def draft(workspace, token, name, title, ranges=None):
     capture = status(workspace, token)
     if capture["state"] != "stopped" or capture["errors"] or not capture["events"]:
         raise ValueError("Stop a nonempty, complete recording before exporting")
-    from .capture_compile import convert
     from .clips import validate_ranges
     spans = validate_ranges(ranges) if ranges is not None else [{"first": 1, "last": len(capture["events"])}]
     if spans[-1]["last"] > len(capture["events"]):
@@ -167,11 +212,11 @@ def draft(workspace, token, name, title, ranges=None):
     steps, unsupported = [], []
     for index, span in enumerate(spans):
         events = capture["events"][span["first"] - 1:span["last"]]
-        actions, problems = convert(events)
+        action, options, problems = compile_actions(events, meta["actors"])
         unsupported.extend((f"Clip {index + 1}: " if len(spans) > 1 else "") + p for p in problems)
-        if actions and len(roles) == 1:
+        if options["actions"]:
             steps.append({"id": "recorded_journey" + (f"_{index + 1}" if len(spans) > 1 else ""),
-                          "action": "journey", "options": {"role": roles[0], "prepare_start": True, "actions": actions}})
+                          "action": action, "options": options})
         else:
             steps.extend({"id": "observe_" + str(e["sequence"]), "action": "recorded_observation",
                           "options": {"summary": e["event"] + ": " + str(e["data"].get("scene", "unknown scene"))}}

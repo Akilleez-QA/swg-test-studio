@@ -103,7 +103,7 @@ class StoreTests(unittest.TestCase):
             data["title"] = "Changed title"
             library.save(data, replace=True)
             self.assertEqual(library.get("my_login")["title"], "Changed title")
-            self.assertEqual(len(library.list()), 9)
+            self.assertEqual(len(library.list()), 11)
 
     def test_path_traversal_never_reads_a_file(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -196,7 +196,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(main(["--workspace", temporary, "list"]), 0)
             value = json.loads(output.getvalue())
-            self.assertEqual(len(value["suites"]), 8)
+            self.assertEqual(len(value["suites"]), 10)
             output.seek(0)
             output.truncate()
             self.assertEqual(main(["--workspace", temporary, "validate", "login_relogin"]), 0)

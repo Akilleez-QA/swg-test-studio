@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory() as workspace:
     try:
         app = Studio(root, workspace)
         root.update_idletasks()
-        assert len(app.tree.get_children()) == 8
+        assert len(app.tree.get_children()) == 10
         app.tree.selection_set("example:login_relogin")
         app.open_selected()
         assert app.current()["id"] == "login_relogin"

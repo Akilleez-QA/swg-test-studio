@@ -77,8 +77,11 @@ def convert(events):
             else:
                 previous = destination
         elif kind == "command_requested":
-            if data.get("command") not in ("sitServer", "logoutServer"):
+            if str(data.get("command", "")).lower() not in ("sitserver", "logoutserver"):
                 problem("A queued command is not supported by recorded shuttle replay")
+        elif kind == "teleport_applied":
+            if not pending or pending["answer"] != "ok":
+                problem("Teleport was observed without a supported initiating travel action")
         elif kind == "control_cleared":
             pass  # Handoff/logout observation, not an inferred travel success.
         elif kind == "movement_requested":

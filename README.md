@@ -9,8 +9,9 @@ for Tansaari/Gamma shuttle confirmations and cancellations. Recorded terminal
 requests, offered dialogs, matching callbacks and authored arrivals become a
 typed journey, using fresh runtime target/page identities during replay. Users
 review the captured expectations before approving a draft. Unsupported actions
-remain blocked. General movement, flight-path replay, other terminals and
-multi-actor recording are pending. On November 8, 2026, automated live capture,
+remain blocked. The Ord action sequence adds launch, landing and two-role
+groups. General movement, flight paths, other terminals and larger groups remain
+open. On November 8, 2026, automated live capture,
 explicit clip export and replay passed for cancellation and both shuttle
 directions. A connected-session round trip also passed. Human Windows-client
 recording and visual acceptance remain pending.
@@ -92,6 +93,8 @@ private: inherited server diagnostics can contain sensitive fields.
 | `login_relogin` | Existing dedicated character; two complete login/logout/save lifecycles |
 | `create_character` | Explicit dedicated creation; respects existing eight-registry budget; separate lifecycle from travel |
 | `gamma_shuttle` | Actor prepared at Tansaari; explicit terminal-proximity setup; original menus/dialogs, Gamma and correct return hangar |
+| `ord_round_trip` | Portable sequence from the accepted live recording of Ord launch and landing |
+| `ord_group_sequence` | Editable typed sequence for two solo Tansaari actors: form a group, promote, launch, land and disband |
 | `ship_and_group` | Two prepared station actors, required original ships/pilot fixture; normal launch, landing and group journey |
 | `group_disband` | Three retained roles and the existing reviewed linked Rryatt/Ord fixture; disband, solo behavior and new-group affinity |
 | `driver_guards` | Existing driver's unit regressions; no live game actions |
@@ -125,7 +128,7 @@ and its matching native contract. This supplies a dedicated writable
 `/teststudio-capture` bind; the existing `/fixture` tools mount remains read-only.
 Record checks the prepared profile, effective game-role flag and exact mount.
 It accepts only exact registered non-god test character
-name, actor ID and station ID. The first implementation records one selected role
+name, actor ID and station ID. The recorder accepts one selected role, or two with the action-capture profile,
 for 30–3600 seconds, with 4096 events/8 MiB bounds and visible incomplete-capture
 errors. It records scene publication, menu requests, offered pages, movement
 markers, command hashes/target IDs and validated SUI callbacks. It does not record passwords, tokens, arbitrary command
@@ -200,6 +203,38 @@ capture fields and `retained_peer` adapter. Old helpers are refused. Captures
 retain their full raw history; 32 observation steps are only a draft preview.
 Arbitrary gameplay replay remains pending.
 
+## Ord travel and two-character groups
+
+The matching server build records the original launch-terminal selection,
+validated station landing response, resolved invitation and join, and
+authoritative group changes. It also records applied local teleports. A move
+without a matching supported initiating action stays in the timeline for review.
+
+Bind two distinct dedicated roles and enter both names separated by a comma in
+Record. The CLI accepts a repeated `--role`. Two-role recording requires the
+action-capture fixture profile. Begin solo and include both invitation and join
+in the same clip as the group's observed membership. A group action sequence can
+also include leadership changes, dismissal, leaving and disbanding. A solo Ord
+launch and landing sequence needs only one role.
+
+Draft export checks the actual travel destination and group state before making
+a typed `action_sequence`. The existing protocol driver opens the live launch
+menu and landing conversation. It checks ownership, pilot, the authored station
+hangar and group membership with fresh identities. The run preview lists the
+pilot reward and proximity preparation used by the fixture and the possible
+cleanup of its own two-character group. During launch setup, an actor without a
+ship receives the original starter ship. The land setup puts the ship within
+normal comm range. The replay report separates setup from measured actions.
+
+Use explicit timeline clips to separate independent actions and omit setup
+transitions. A clip containing unsupported activity remains unapproved. The
+coverage inventory in the server repository tracks other player travel,
+gameplay and client-side entry points.
+
+The live Ord recording and replay gate passed for one dedicated pilot. Group
+recording and replay have component coverage. Live group acceptance requires a
+second available dedicated actor.
+
 ## Verify and coverage limits
 
 ```text
@@ -216,6 +251,6 @@ full unload and saved-position checks. The complete raw capture is retained;
 login/setup transitions outside the explicit clips remain unsupported as whole-
 timeline replay. Other bundled server recipes have schema/adapter coverage and
 their own server acceptance history; they were not all rerun for this milestone.
-Human recording, generic movement, other terminal compilers and multi-actor
-recording remain open. Stage 8 acceptance remains owned by the SWG server project
+Human recording, general movement, other terminal compilers and larger
+recording rosters remain open. Stage 8 acceptance remains owned by the SWG server project
 and is not changed by this application.
