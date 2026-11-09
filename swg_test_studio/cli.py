@@ -6,7 +6,9 @@ from pathlib import Path
 import subprocess
 import sys
 
-from .backend import environment, plan, run_suite
+from .backend import environment, environment_template, plan, run_suite
+from .batch import MAX_JOBS, batch_template, prepare_batch, run_batch
+from .collection import Collection, export_regression, is_driver_suite
 from .model import loads, validate
 from .store import DEFAULT_WORKSPACE, Library, read_json
 
@@ -26,12 +28,15 @@ def windows_relay(args, workspace):
         return subprocess.check_output(["wsl.exe", "-d", distro, "--exec", "wslpath", "-a", str(Path(value).absolute())], text=True).strip()
     launcher = Path(__file__).with_name("entry.py")
     forwarded = list(args)
-    if "--workspace" not in forwarded:
+    if not any(value.split("=", 1)[0] == "--workspace" for value in forwarded):
         forwarded[0:0] = ["--workspace", linux(workspace)]
-    for option in ("--workspace", "--environment"):
-        if option in forwarded:
-            index = forwarded.index(option) + 1
-            forwarded[index] = linux(forwarded[index])
+    for index, argument in enumerate(forwarded):
+        option, separator, value = argument.partition("=")
+        if option in ("--workspace", "--environment", "--collection", "--file"):
+            if separator:
+                forwarded[index] = option + "=" + linux(value)
+            else:
+                forwarded[index + 1] = linux(forwarded[index + 1])
     return subprocess.call(["wsl.exe", "-d", distro, "--exec", "python3", linux(launcher), *forwarded])
 
 
@@ -39,6 +44,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(description="SWG Test Studio — desktop, saved driver suites and fixture recording")
     parser.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE)
+    parser.add_argument("--collection", type=Path, help="Use an editable Studio collection JSON")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("gui", help="Open the local graphical application")
     commands.add_parser("list", help="List bundled examples and your saved tests")
@@ -48,10 +54,18 @@ def main(argv=None):
     child = commands.add_parser("save", help="Validate and save a user-defined JSON suite")
     child.add_argument("--file", type=Path, required=True)
     child.add_argument("--replace", action="store_true")
+    child = commands.add_parser("export-regression", help="Collect Studio examples and all saved SWG driver suites")
+    child.add_argument("--server-checkout", type=Path, required=True)
+    child.add_argument("--output", type=Path, required=True)
     for action in ("plan", "run"):
         child = commands.add_parser(action)
         child.add_argument("suite")
         child.add_argument("--environment", type=Path, required=True)
+    commands.add_parser("batch-template", help="Print an example batch with two fixture profiles")
+    for action in ("plan-batch", "run-batch"):
+        child = commands.add_parser(action, help="Preview or run a batch of Studio suites")
+        child.add_argument("--file", type=Path, required=True)
+        child.add_argument("--jobs", type=int, default=1, choices=range(1, MAX_JOBS + 1))
     commands.add_parser("environment-template", help="Print an editable environment example (contains no credentials)")
     child = commands.add_parser("record-start")
     child.add_argument("--environment", type=Path, required=True)
@@ -67,27 +81,48 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.command is None or args.command == "gui":
         from .gui import launch
-        launch(args.workspace)
+        launch(args.workspace, args.collection)
         return 0
-    if os.name == "nt" and (args.command == "run" or args.command.startswith("record-")):
+    if os.name == "nt" and (args.command in ("run", "plan-batch", "run-batch") or args.command.startswith("record-")):
         return windows_relay(argv, args.workspace)
-    library = Library(args.workspace)
+    library = Collection(args.collection) if args.collection else Library(args.workspace)
     try:
         if args.command == "list":
             emit({"suites": library.list()})
         elif args.command == "show":
             emit(library.get(args.suite))
         elif args.command == "validate":
-            validate(library.get(args.suite), runnable=True)
-            emit({"valid": True, "suite": args.suite})
+            suite = library.get(args.suite)
+            if is_driver_suite(suite):
+                emit({"valid": True, "suite": args.suite, "validation": "driver manifest structure",
+                      "studio_replay": False})
+            else:
+                validate(suite, runnable=True)
+                emit({"valid": True, "suite": args.suite})
         elif args.command == "save":
             emit({"saved": str(library.save(read_json(args.file), replace=args.replace))})
+        elif args.command == "export-regression":
+            emit({"saved": str(export_regression(args.server_checkout, args.output))})
         elif args.command == "environment-template":
-            emit({"schema_version": 1, "name": "My isolated SWG fixture",
-                  "server_checkout": "/path/to/swg-checkout", "folder": "/tmp/swg-cold-test-0123abcd/client-012345abcdef",
-                  "binary": "/path/to/matched-elf64-driver", "bindings": {"actor": "beta"}})
+            emit(environment_template())
+        elif args.command == "batch-template":
+            emit(batch_template())
+        elif args.command in ("plan-batch", "run-batch"):
+            prepared = prepare_batch(args.file, library)
+            if args.command == "plan-batch":
+                emit({"max_workers": args.jobs, "runs": [
+                    {"id": job["id"], "suite": job["suite"]["id"], "environment": job["env"]["name"],
+                     "exclusive_scopes": dict(job["scopes"])} for job in prepared
+                ]})
+            else:
+                result = run_batch(prepared, args.workspace, args.jobs, emit)
+                emit(result)
+                return 130 if result["interrupted"] else int(not result["passed"])
         elif args.command in ("plan", "run"):
-            suite, env = library.get(args.suite), environment(args.environment)
+            suite = library.get(args.suite)
+            if is_driver_suite(suite):
+                raise ValueError("Driver manifests use the original server test harness. Select a Studio test for replay.")
+            env = environment(args.environment)
             if args.command == "plan":
                 emit(plan(suite, env))
             else:

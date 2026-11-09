@@ -44,11 +44,77 @@ client modification. Wheel packaging requires the normal `setuptools` and
 `wheel` build dependencies; it was not validated on the initial host because
 Windows lacked `wheel` and the WSL Python lacked `pip`.
 
-The graphical interface has Library, Edit, Record and Run & Results views. Open
-an example, give it a new ID, edit its typed JSON and Save. Preview is read-only;
-save edits before previewing/running. Examples themselves are read-only.
+Start in **Library**. Select an example to see what it checks and which
+characters it needs. **Open** and **Validate** work offline. **Copy example**
+creates an editable saved test. Use **Help** for the workflow and **Set up
+environment** when you are ready to preview, run or record.
+
+## Reusable regression collections
+
+A collection is one versioned JSON file holding multiple complete suites. Use
+**Library → Import JSON** to open it, then **Save collection as** to make your
+own copy. Search by title or ID. Open a suite to edit it, or choose **New test**
+to add a draft. Review the draft and click **Save** to add it to the open
+collection. You can also import an individual test or record a draft and save
+it into the collection. **Export test** writes the current suite to a separate
+JSON file.
+
+The full SWG regression collection is supplied in the server checkout at
+`devtools/teststudio_server/swg-regression-collection.json`. It includes Studio
+examples and exact copies of the original saved driver manifests. Studio runs
+the Studio entries. Driver entries can be inspected, edited and exported in
+their original format for the server harness. Their backend validation,
+fixture requirements and authorization remain with the server harness.
+Opening a collection runs nothing.
+
+Use the same collection in CI. Run a Studio suite by ID with the environment
+for that job's isolated fixture.
+
+```bash
+python3 swg-tests.py --collection swg-regression-collection.json list
+python3 swg-tests.py --collection swg-regression-collection.json validate ord_round_trip
+python3 swg-tests.py --collection swg-regression-collection.json run ord_round_trip --environment environment.json
+```
+
+To take a fresh baseline snapshot, export to a new filename. Keep any edited
+collections in version control and bring forward your additions separately.
+
+```bash
+python3 swg-tests.py export-regression --server-checkout /path/to/whitengold --output swg-regression-new.json
+```
+
+## Run suites concurrently
+
+In **Run & Results**, select **Save batch template**, fill in each run's suite
+ID and environment filename, then choose **Preview batch** or **Run batch**.
+Select your collection first when the suites are stored there. Each profile
+path can be relative to the batch file or an absolute Linux path.
+
+```bash
+python3 swg-tests.py batch-template > batch.json
+python3 swg-tests.py --collection swg-regression-collection.json plan-batch --file batch.json --jobs 2
+python3 swg-tests.py --workspace "$RUNNER_TEMP/studio" --collection swg-regression-collection.json run-batch --file batch.json --jobs 2
+```
+
+The limit is 1–8 workers and the CLI defaults to one. Suites sharing a server
+checkout or a fixture project run in file order. A failure is reported while
+the remaining suites are still run. Real overlap requires separate prepared
+fixture projects and independent server checkouts. For GitHub Actions, a
+matrix with one isolated runner and fixture per shard also provides
+parallelism while retaining the existing management lock on each runner.
+
+Batch output is under the workspace's `batches/<operation>/` directory.
+Archive `batch-result.json`, `batch-junit.xml` and each suite's JSON, JUnit and
+logs from there. A failed suite makes the batch exit nonzero. Driver-only
+manifests remain in the original harness.
 
 ## Environments and execution
+
+An environment profile tells Studio which server checkout, test fixture and
+driver to use. It also maps the test's role names to dedicated character
+registries in that fixture. The desktop form explains each field, shows an
+example and saves the JSON for you. **Open profile** loads an existing file.
+Studio reopens the profile named `environment.json` in its workspace at launch.
 
 The SWG server checkout, matched ELF64 driver, WSL/Linux runtime and prepared
 isolated fixture are external dependencies. No server/client source, libraries,

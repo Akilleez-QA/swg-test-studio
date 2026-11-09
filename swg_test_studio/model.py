@@ -24,9 +24,9 @@ def exact(value, fields, label):
         raise ValueError("Unknown or missing " + label + " fields")
 
 
-def loads(text):
-    if len(text.encode("utf-8")) > 262144:
-        raise ValueError("Suite exceeds 256 KiB")
+def loads(text, *, max_bytes=262144):
+    if len(text.encode("utf-8")) > max_bytes:
+        raise ValueError(f"JSON exceeds {max_bytes // 1024} KiB")
     def pairs(items):
         obj = {}
         for key, value in items:

@@ -11,11 +11,13 @@ EXAMPLES = Path(__file__).with_name("examples")
 DEFAULT_WORKSPACE = Path(os.environ.get("LOCALAPPDATA", os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))) / "SWGTestStudio"
 
 
-def read_json(path):
+def read_json(path, *, max_bytes=262144):
     path = Path(path)
-    if path.stat().st_size > 262144:
-        raise ValueError("Document exceeds 256 KiB")
-    return loads(path.read_text(encoding="utf-8"))
+    with path.open("rb") as stream:
+        data = stream.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError(f"JSON exceeds {max_bytes // 1024} KiB")
+    return loads(data.decode("utf-8"), max_bytes=max_bytes)
 
 
 def write_json(path, data, *, replace=False):
@@ -43,11 +45,17 @@ class Library:
     def __init__(self, workspace=DEFAULT_WORKSPACE):
         self.workspace = Path(workspace).absolute()
 
-    def list(self):
+    def list(self, *, on_invalid_saved_test=None):
         result = []
         for origin, folder in (("example", EXAMPLES), ("user", self.workspace / "suites")):
             for path in sorted(folder.glob("*.json")):
-                suite = validate(read_json(path))
+                try:
+                    suite = validate(read_json(path))
+                except (OSError, ValueError) as exc:
+                    if origin == "example" or on_invalid_saved_test is None:
+                        raise
+                    on_invalid_saved_test(path, exc)
+                    continue
                 result.append({"id": suite["id"], "title": suite["title"], "origin": origin,
                                "category": suite["category"], "roles": suite["roles"],
                                "approved": suite["review"]["approved"], "path": str(path)})

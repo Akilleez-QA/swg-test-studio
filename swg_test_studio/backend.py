@@ -15,6 +15,17 @@ from .model import compile_suite, exact, ROLE
 from .store import read_json, write_json
 
 
+def environment_template():
+    return {
+        "schema_version": 1,
+        "name": "My isolated SWG fixture",
+        "server_checkout": "/mnt/f/SWGProjects/swg-server",
+        "folder": "/tmp/swg-cold-test-0123abcd/client-012345abcdef",
+        "binary": "/tmp/swg-driver64/driver",
+        "bindings": {"actor": "tester"},
+    }
+
+
 def environment(path):
     return validate_environment(read_json(path))
 
@@ -48,8 +59,9 @@ def local_path(value):
 
 def plan(suite, env):
     bindings = {r: env["bindings"][r] for r in suite["roles"] if r in env["bindings"]}
-    if set(bindings) != set(suite["roles"]):
-        raise ValueError("Bind every declared role in the environment")
+    missing = [role for role in suite["roles"] if role not in bindings]
+    if missing:
+        raise ValueError("Add a dedicated registry key for each missing role in Environment setup: " + ", ".join(missing))
     manifest = compile_suite(suite, local_path(env["server_checkout"]) / "devtools/zones/test_sets")
     cases = manifest["tests"]
     action_kinds = {
