@@ -7,7 +7,9 @@ import re
 
 from linked_instances import rryatt_sets
 
-REPO = Path(__file__).resolve().parents[2]
+from studio_tool_bundle import server_source
+
+REPO = server_source()
 CATALOG = Path(__file__).with_name("catalog.json")
 SERVER_TABLES = Path("dsrc/sku.0/sys.server/compiled/game/datatables")
 SHARED_TABLES = Path("dsrc/sku.0/sys.shared/compiled/game/datatables")

@@ -18,6 +18,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from prepare_client_fixture_schema import REPO
+from studio_tool_bundle import zone_tool_hashes
 
 SETS = Path(__file__).with_name('test_sets')
 OPTIONS = {'create': bool, 'disconnect': bool, 'prepare_terminal': bool, 'position_terminal_only': bool, 'stage_station': bool,
@@ -242,18 +243,11 @@ def source_hashes():
     # portal rows/templates. Pin those actual inputs, not only its generator.
     from hosted_snapshot_contract import model as snapshot_model
     names.update('../../'+name for name in snapshot_model()['input_sha256'])
-    tools = root.parent
-    if (tools / 'studio-tools.json').exists():
-        from os.path import relpath
-        from studio_tool_bundle import verify
-
-        # Studio retains the native/asset provenance and hashes its exact tool set.
-        source = {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in sorted(names)
-                  if name.startswith(('../../src/', '../../dsrc/'))}
-        source.update({Path(relpath(tools / name, root)).as_posix(): digest
-                       for name, digest in verify(tools).items()})
-        return source
-    return {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in sorted(names)}
+    # Keep the original native/asset receipts alongside the pinned tools.
+    source = {name: hashlib.sha256((REPO/name[6:]).read_bytes()).hexdigest() for name in sorted(names)
+              if name.startswith(('../../src/', '../../dsrc/'))}
+    source.update(zone_tool_hashes())
+    return source
 
 
 def runtime_artifact(log, folder):
@@ -456,9 +450,9 @@ def command(case, bindings, folder, binary, native=None, console=None, retiremen
     return result
 
 
-def execute(argv, log, timeout=1200):
+def execute(argv, log, timeout=1200, env=None):
     """Interrupt a timed-out backend so its guarded cleanup can finish."""
-    process = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, env=env)
     try:
         return process.wait(timeout=timeout), False
     except (subprocess.TimeoutExpired, KeyboardInterrupt) as interrupted:

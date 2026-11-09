@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from capacity import REPO,SERVER_TABLES,SHARED_TABLES,read_table
 from template_controller_evidence import Templates
+from studio_tool_bundle import TOOLS_ROOT
 
 SOURCE_SCENES=('kashyyyk_dead_forest','kashyyyk_hunting','kashyyyk_main')
 # Main remains an original geometry input; it is never a dynamic test target.
@@ -52,7 +53,7 @@ def model(repo=REPO):
 
 
 def verify_source(repo=REPO):
-    result=model(repo);source=(Path(repo)/'devtools/zones/fixtures/ground_cell_entry.java').read_text()
+    result=model(repo);source=(TOOLS_ROOT/'zones/fixtures/ground_cell_entry.java').read_text()
     def array(name):
         found=re.search(r'\b'+name+r'=\{(.*?)\};',source,re.S)
         if not found:raise ValueError('Missing typed fixture array: '+name)

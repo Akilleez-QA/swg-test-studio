@@ -1,4 +1,4 @@
-"""Explicit dependency on the SWG checkout; never a second driver implementation."""
+"""Run the pinned SWG driver against the selected server source and fixture."""
 import contextlib
 from datetime import datetime, timezone
 import hashlib
@@ -12,6 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from .model import compile_suite, exact, ROLE
+from .server_tools import load_tool, source_folder, tool_environment, verified_tool_root
 from .store import read_json, write_json
 
 
@@ -62,7 +63,7 @@ def plan(suite, env):
     missing = [role for role in suite["roles"] if role not in bindings]
     if missing:
         raise ValueError("The test setup has no characters assigned for these parts: " + ", ".join(missing))
-    manifest = compile_suite(suite, local_path(env["server_checkout"]) / "devtools/zones/test_sets")
+    manifest = compile_suite(suite, verified_tool_root() / "zones/test_sets")
     cases = manifest["tests"]
     action_kinds = {
         action["kind"]
@@ -89,13 +90,9 @@ def plan(suite, env):
 def driver_modules(env):
     if sys.platform != "linux":
         raise ValueError("Live operations require Linux/WSL; use the Windows launcher to relay them")
-    tools = Path(env["server_checkout"]).resolve(strict=True) / "devtools/zones"
-    sys.path.insert(0, str(tools))
-    import protocol_driver
-    import protocol_test_sets
-    if Path(protocol_driver.__file__).resolve().parent != tools:
-        raise ValueError("An incompatible driver module is already loaded")
-    return protocol_driver, protocol_test_sets
+    source = source_folder(env["server_checkout"])
+    load_tool("zones/studio_tool_bundle.py").bind_server_source(source)
+    return load_tool("zones/protocol_driver.py"), load_tool("zones/protocol_test_sets.py")
 
 
 @contextlib.contextmanager
@@ -138,11 +135,14 @@ def run_suite(suite, env, workspace, emit=print):
         try:
             emit({"event": "run_preparing", "operation": operation, "cases": len(manifest["tests"])})
             report["source_hashes"] = legacy.source_hashes()
-            root = Path(env["server_checkout"])
-            report["studio_adapter_sha256"] = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
-                "devtools/teststudio_server/retained_peer.py",
-                "src/engine/server/library/serverGame/src/shared/core/TestStudioRecorder.h",
-                "src/engine/server/library/serverGame/src/shared/core/TestStudioCapture.h") if (root / name).is_file()}
+            inputs = {"devtools/teststudio_server/retained_peer.py": verified_tool_root() / "teststudio_server/retained_peer.py"}
+            for header in ("TestStudioRecorder.h", "TestStudioCapture.h"):
+                relative = "src/engine/server/library/serverGame/src/shared/core/" + header
+                if (driver.REPO / relative).is_file():
+                    inputs[relative] = driver.REPO / relative
+            report["studio_adapter_sha256"] = {
+                name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in inputs.items()
+            }
             for case in manifest["tests"]:
                 started = time.monotonic()
                 row = {"id": case["id"], "kind": case["kind"], "passed": False}
@@ -162,7 +162,7 @@ def run_suite(suite, env, workspace, emit=print):
                         else:
                             argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
                         with case_log.open("x") as log:
-                            code, timed_out = legacy.execute(argv, log, timeout=2400)
+                            code, timed_out = legacy.execute(argv, log, timeout=2400, env=tool_environment(driver.REPO))
                         row.update(exit_code=code, timed_out=timed_out, passed=code == 0 and not timed_out)
                         if row["passed"] and case["kind"] != "driver_unit":
                             row["artifact"] = legacy.runtime_artifact(case_log, Path(env["folder"]))

@@ -7,7 +7,9 @@ maintenance and validate the full native/script package before activation.
 from pathlib import Path
 import hashlib,re,stat
 from private_crew_fixture import SCHEMA
-REPO=Path(__file__).resolve().parents[2]
+from studio_tool_bundle import server_source
+
+REPO=server_source()
 
 MARKER='private-group-choices-fixture'
 JOURNAL='/capacity-journal/private-departures'

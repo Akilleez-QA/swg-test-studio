@@ -21,7 +21,7 @@ class BotConsoleTests(unittest.TestCase):
         # socket boundary. Keep its actual number/name/command checks intact.
         number = source[source.index('static bool number'):source.index('static bool transfer')]
         main = source[source.index('int main('):source.index('    for(int i=3;')]
-        scope=(Path(__file__).resolve().parents[2]/'src/engine/server/library/serverUtility/src/shared/ZoneInstanceScope.h').read_text()
+        scope=(test_login_recovery.REPO/'src/engine/server/library/serverUtility/src/shared/ZoneInstanceScope.h').read_text()
         probe = '#include <string>\n#include <cstring>\n#include <iostream>\n'+scope+number+main
         probe += 'for(int i=3;i<argc;++i) {command+=" "+std::string(argv[i]);}\nstd::cout<<command;return 0;}\n'
         cls.folder = tempfile.TemporaryDirectory(prefix='swg-bot-console-guards-')

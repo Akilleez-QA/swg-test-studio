@@ -12,6 +12,7 @@ import tempfile
 import time
 
 from .setup import available_setups, checked_setup
+from .server_tools import tool_environment, verified_tool_root
 from .store import read_json
 
 REUSE_ROLES = ("chat", "local_chat", "game")
@@ -156,7 +157,7 @@ def prepare_restart(driver, folder, rows, stage):
 
 
 def wait_for_preload(driver, folder):
-    verifier = driver.REPO / "devtools/zones/inspect_client_fixture.py"
+    verifier = verified_tool_root() / "zones/inspect_client_fixture.py"
     deadline = time.monotonic() + 480
     detail = ""
     with tempfile.TemporaryDirectory(prefix="swg-studio-ready-") as directory:
@@ -170,7 +171,7 @@ def wait_for_preload(driver, folder):
                     [sys.executable, str(verifier), "--folder", str(folder), "--output", str(output),
                      "--stage5", "--expected-instances", "1"],
                     stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
-                    timeout=min(300, remaining))
+                    timeout=min(300, remaining), env=tool_environment(driver.REPO))
             except subprocess.TimeoutExpired:
                 detail = "The native readiness check timed out."
                 continue

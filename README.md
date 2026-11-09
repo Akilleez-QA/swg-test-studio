@@ -166,7 +166,7 @@ with the WSL distribution used by Studio (`Ubuntu-24.04` by default).
 
 1. Click **Choose source folder** and select the WhiteNGold server checkout or
    its `src` folder. Studio remembers it and finds verified Docker test servers.
-   If the checkout has no `devtools`, install Studio's bundled copy first.
+   Studio loads its pinned tools directly from its own `devtools/`.
 2. Click **Find or start test server** to refresh the list. If no verified
    server is running, Studio starts one prepared server and leaves it
    available for testing. Select another verified server if needed.
@@ -179,32 +179,19 @@ You can create and validate tests offline. **Remove from Studio** hides a test
 in the current workspace and preserves the file. Turn on **Show removed tests**
 to restore it. **Server test** identifies a test for the original SWG test tools.
 
-### Install the bundled server tools
+### Pinned server tools
 
-Studio ships a pinned subset of WhiteNGold's `devtools/` for its existing driver,
-readiness checks, recording and saved recipes. If the matching server source
-checkout lacks that folder, run the installer from Studio.
+Studio's repository and source ZIP include the WhiteNGold runners, their
+dependencies and the test recipes Studio uses. Studio resolves these files
+from its own `devtools/` directory, including when the selected server checkout
+has a different tools version. Choose the matching server checkout for its
+native source, authored data and local release and fixture records. Live runs
+also need the matched ELF64 protocol peer and an isolated prepared Docker server.
 
-```powershell
-python swg-tests.py install-server-tools --source "C:/path/to/whitengold"
-```
-
-The command installs tools alongside the server's `src/` and verifies their
-hashes. It can be repeated after an interrupted copy and refuses differing
-files. Then select that server source folder in Studio. A full WhiteNGold
-checkout can use its existing tools directly.
-
-The tools bundle supplies Python runners, their input files and the driver
-source needed for provenance checks. Live runs still require matching server
-source, the built ELF64 protocol peer and a prepared isolated Docker test server.
-
-`devtools/studio-tools.json` records the WhiteNGold base revision and an exact
-file and SHA-256 allowlist. Preserve the listed files' bytes when refreshing
-the bundle. The two server readiness and action-runner files include the latest
-local fixes from that checkout. Studio's copy of `protocol_test_sets.py` keeps
-the native and game data provenance and records the hashes of the tools in the
-bundle. Historical manifests used by the offline driver guard tests are fixtures
-for those tests. Studio exposes the existing allowlist of runnable actions.
+`devtools/studio-tools.json` records the WhiteNGold base revision and each
+bundled file's SHA-256. The fixture contracts retain the upstream producer
+hashes for the modules adapted to separate tool and server paths. Run reports
+record the actual bundled bytes alongside the server source evidence.
 
 ### Prepare a Docker test server
 

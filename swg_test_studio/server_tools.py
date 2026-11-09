@@ -1,49 +1,51 @@
-"""Install the exact bundled tools into a separately selected SWG server tree."""
+"""Resolve trusted bundled tools separately from each selected server source."""
+from functools import cache
+from importlib import import_module
+from importlib.util import module_from_spec, spec_from_file_location
+import os
 from pathlib import Path
+import sys
 
-from devtools.zones.studio_tool_bundle import MANIFEST, check_path, verify
+TOOLS_ROOT = Path(__file__).resolve().parents[1] / "devtools"
+_spec = spec_from_file_location("swg_studio_tool_bundle", TOOLS_ROOT / "zones/studio_tool_bundle.py")
+_bundle = module_from_spec(_spec)
+_spec.loader.exec_module(_bundle)
+SOURCE_ROOT_ENV = _bundle.SOURCE_ROOT_ENV
 
 
-BUNDLED_TOOLS = Path(__file__).resolve().parents[1] / "devtools"
+@cache
+def verified_tool_root():
+    _bundle.verify(TOOLS_ROOT)
+    return TOOLS_ROOT
 
 
 def bundled_paths():
-    return [BUNDLED_TOOLS / name for name in (MANIFEST, *sorted(verify(BUNDLED_TOOLS)))]
+    return [TOOLS_ROOT / name for name in (_bundle.MANIFEST, *sorted(_bundle.verify(TOOLS_ROOT)))]
 
 
-def install_server_tools(path):
+def source_folder(path):
     source = Path(path)
     if source.name.casefold() == "src":
         source = source.parent
-    source = source.resolve(strict=True)
+    source = source.resolve()
     if not all((source / marker).is_file() for marker in (
             "src/engine/server/application/CentralServer/Makefile.am",
             "src/game/server/application/SwgGameServer/Makefile.am")):
         raise ValueError("Choose the WhiteNGold server source folder or its src folder.")
+    return source
 
-    destination = check_path(source, "devtools")
-    manifest = check_path(destination, MANIFEST)
-    files = bundled_paths()
-    # Publish the manifest last so a partially copied installation can be retried.
-    files = files[1:] + files[:1]
-    targets = []
-    for original in files:
-        target = check_path(destination, original.relative_to(BUNDLED_TOOLS).as_posix())
-        data = original.read_bytes()
-        if target.exists():
-            if not target.is_file() or target.read_bytes() != data:
-                raise ValueError("Existing server tool differs from the Studio bundle: " + str(target))
-        else:
-            targets.append((target, data))
-    if manifest.is_file():
-        verify(destination)
-    elif destination.exists():
-        expected = {destination / original.relative_to(BUNDLED_TOOLS) for original in files}
-        if any(path.is_file() and path not in expected for path in destination.rglob("*")):
-            raise ValueError("Use the existing server checkout tools. Studio will not mix the bundle with another tool tree.")
-    for target, data in targets:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("xb") as stream:
-            stream.write(data)
-    verify(destination)
-    return destination
+
+def load_tool(relative):
+    path = verified_tool_root() / relative
+    directory = str(path.parent)
+    if directory in sys.path:
+        sys.path.remove(directory)
+    sys.path.insert(0, directory)
+    module = sys.modules.get(path.stem) or import_module(path.stem)
+    if Path(module.__file__).resolve() != path:
+        raise ValueError("Unexpected module loaded for Studio tool " + path.stem)
+    return module
+
+
+def tool_environment(source):
+    return dict(os.environ, **{SOURCE_ROOT_ENV: str(source)})

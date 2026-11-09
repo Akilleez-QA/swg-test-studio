@@ -17,12 +17,14 @@ import sys
 import time
 import uuid
 
-REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "devtools/docker"))
+from studio_tool_bundle import TOOLS_ROOT, server_source
+
+REPO = server_source()
+sys.path.insert(0, str(TOOLS_ROOT / "docker"))
 from zones import available_zones, cfg_zones, save_zones, select_zones, validate_zones
 from configure import NODES
 from multiserver_scenario import NAME as CROWDED_SCENARIO, high_configs, expected_workers
-sys.path.insert(0, str(REPO / "devtools/zones"))
+sys.path.insert(0, str(TOOLS_ROOT / "zones"))
 from capacity import load_catalog, load_policy, preview as capacity_preview, content_inventory
 from instance_definitions import definitions as zone_instance_definitions
 from observe import collect as collect_capacity_observation, report as capacity_status

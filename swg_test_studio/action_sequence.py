@@ -39,9 +39,9 @@ def validate(options, declared_roles):
 
 
 def command(options, env, bindings, output, identifier):
-    from pathlib import Path
     import sys
 
+    from .server_tools import verified_tool_root
     from .store import write_json
 
     roles = options["roles"]
@@ -55,7 +55,7 @@ def command(options, env, bindings, output, identifier):
     path = output / (identifier + "-actions.json")
     write_json(path, {"schema_version": 1, "actions": actions})
     return [
-        sys.executable, str(Path(env["server_checkout"]) / "devtools/zones/protocol_scenarios.py"),
+        sys.executable, str(verified_tool_root() / "zones/protocol_scenarios.py"),
         "--folder", env["folder"], "--binary", env["binary"], "--bots",
         *(bindings[role] for role in roles), "--studio-actions", str(path),
     ]

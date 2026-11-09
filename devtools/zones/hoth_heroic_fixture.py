@@ -7,6 +7,7 @@ from capacity import REPO
 from hosted_capacity_layout import contracts
 from hosted_login_contract import model as login_contract
 from hosted_private_entry_contract import model as entry_contract
+from studio_tool_bundle import contract_input_sha256
 
 MARKER='hoth-heroic-fixture'
 HOST='adventure2'
@@ -23,7 +24,7 @@ def policy():
     global _policy_cache
     if _policy_cache is not None:
         value,inputs=_policy_cache
-        if any(not (REPO/name).is_file() or hashlib.sha256((REPO/name).read_bytes()).hexdigest()!=digest for name,digest in inputs.items()):
+        if any(contract_input_sha256(REPO,name)!=digest for name,digest in inputs.items()):
             raise ValueError('Hoth source changed during fixture planning; restart with fresh provenance')
         return copy.deepcopy(value)
     layout=contracts();login=login_contract();entry=entry_contract()

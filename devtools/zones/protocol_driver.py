@@ -23,7 +23,8 @@ from prepare_client_fixture_schema import REPO, target_root, run
 from disposable_database import validate
 from instance_schema_upgrade import sql_script
 from prepare_stage5_client_fixture64 import inspect_project
-sys.path.insert(0, str(REPO / 'devtools/manage'))
+from studio_tool_bundle import TOOLS_ROOT
+sys.path.insert(0, str(TOOLS_ROOT / 'manage'))
 from service import operation_lock
 
 

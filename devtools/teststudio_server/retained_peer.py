@@ -40,9 +40,10 @@ def open_peer(folder, binary, registry):
         report = dict(schema_version=1,operation=operation,project=project,schema=schema,passed=False,
                       fully_unloaded=False,client_source_changed=False,bot=bot,
                       binary_sha256=proof['binary_sha256'],setup=[],checks=[],cleanup_errors=[])
-        sources=[Path(__file__),REPO/'devtools/zones/protocol_driver.py',REPO/'devtools/zones/fixtures/protocol_bot.java']
+        from studio_tool_bundle import TOOLS_ROOT
+        sources=[Path(__file__),TOOLS_ROOT.parent/'devtools/zones/protocol_driver.py',TOOLS_ROOT/'zones/fixtures/protocol_bot.java']
         report['adapter_version']=PROTOCOL_PEER_VERSION
-        report['backend_sha256']={str(p.relative_to(REPO)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
+        report['backend_sha256']={str(p.relative_to(TOOLS_ROOT.parent)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
         session = None
         original = None
         class Peer:
@@ -107,7 +108,7 @@ def open_peer(folder, binary, registry):
             except Exception as exc:report['cleanup_errors'].append(str(exc));report['passed']=False
             for path in sources:
                 try:
-                    if hashlib.sha256(path.read_bytes()).hexdigest()!=report['backend_sha256'][str(path.relative_to(REPO))]:
+                    if hashlib.sha256(path.read_bytes()).hexdigest()!=report['backend_sha256'][str(path.relative_to(TOOLS_ROOT.parent))]:
                         raise RuntimeError('Adapter source changed during replay')
                 except (OSError,RuntimeError) as exc:
                     report['cleanup_errors'].append(str(exc));report['passed']=False

@@ -1,9 +1,10 @@
 """Opt-in recorder capability and narrow storage mount for isolated SWG fixtures."""
-import hashlib
 from pathlib import Path
 import re
 
-REPO=Path(__file__).resolve().parents[2]
+from studio_tool_bundle import contract_input_sha256, server_source
+
+REPO=server_source()
 CAPTURE_ROOT='/teststudio-capture'
 BEGIN='# BEGIN SWG TEST STUDIO RECORDING'
 END='# END SWG TEST STUDIO RECORDING'
@@ -30,7 +31,7 @@ TOOLS=('devtools/teststudio_server/retained_peer.py','devtools/teststudio_server
 
 def contract():
     return dict(schema_version=1,capture_contract=2,action_capture=1,terminal_metadata=2,adapter_version=1,capture_root=CAPTURE_ROOT,
-                inputs={name:hashlib.sha256((REPO/name).read_bytes()).hexdigest() for name in NATIVE+TOOLS})
+                inputs={name:contract_input_sha256(REPO,name) for name in NATIVE+TOOLS})
 
 
 def supports(manifest):

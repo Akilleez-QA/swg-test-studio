@@ -484,7 +484,7 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(driver.expected_prompt(dict(page, name='Script.inputBox'), '@npe:gamma_shuttle_prompt'))
 
     def test_shuttle_direction_uses_original_return_room_not_general_entrance(self):
-        root = Path(__file__).resolve().parents[2]
+        root = driver.REPO
         scripts = root/'dsrc/sku.0/sys.server/compiled/game/script'
         original = (scripts/'library/npe.scriptlib').read_text()
         special = re.search(r'FROM_ORD_SPACE_TO_STATION_CELL\s*=\s*"([^"]+)"', original).group(1)

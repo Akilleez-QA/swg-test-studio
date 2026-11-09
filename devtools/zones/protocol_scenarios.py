@@ -15,6 +15,7 @@ import re
 import secrets
 import time
 
+from studio_tool_bundle import zone_tool_hashes
 from protocol_driver import (REPO, Session, bot_query, fixture, identity,
                              operation_lock, run, saved, settled, unloaded)
 
@@ -794,18 +795,11 @@ def main():
                   'bots': bots, 'binary_sha256': hashlib.sha256(raw).hexdigest(), 'source_sha256': digest,
                   'game_image_id': services['game']['Image'], 'oracle_container_id': services['oracle']['Id'],
                   'checks': [], 'setup': [], 'saved': {}, 'passed': False,
-                  'backend_sources': {name: hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
-                                      for name in ('protocol_driver.py', 'protocol_scenarios.py',
-                                                   'protocol_fault_scenarios.py', 'protocol_preservation.py', 'rryatt_group.py', 'rryatt_live.py', 'rryatt_fault.py', 'rryatt_demand.py', 'rryatt_demand_content.py', 'rryatt_demand_capacity.py', 'rryatt_demand_combat.py', 'rryatt_demand_fault.py', 'rryatt_fault_tools.py', 'fixture_rryatt_signal.cpp', 'world_save_scenario.py', 'world_shutdown_scenario.py', 'reviewed_shutdown.py', 'automatic_retirement_scenario.py', 'retirement_live_fault.py', 'retirement_occupied.py', 'group_affinity_lifecycle.py', 'private_solo_admission.py', 'private_owned_lifecycle.py','hosted_private_mtp_live.py','private_active_join_live.py', 'encounter_withdrawal_live.py','encounter_enrollment_live.py','encounter_offline_live.py','encounter_load_live.py','encounter_reuse_live.py','encounter_recovery_live.py','encounter_root_claim_live.py','encounter_bootstrap_live.py','encounter_census_live.py','encounter_origin_live.py', 'hosted_public_live.py', 'fixtures/hosted_public_entry.java', 'whole_world_live.py', 'kachirho_single_live.py', 'ground_cell_live.py', 'ground_group_live.py', 'ground_cell_fixture.py', 'fixtures/ground_cell_entry.java', 'fixtures/world_entry.java', 'fixtures/protocol_bot.java', 'private_lease_observation.py', 'hosted_family_live.py', 'retirement_interrupted_arrival.py', 'retirement_combat_windows.py', 'retirement_offline.py', 'retirement_falcon.py', 'fixture_retirement_signal.cpp', 'fixtures/retirement_claim.java')},
+                  'backend_sources': zone_tool_hashes(),
                   'created_images': 0, 'created_databases': 0, 'client_source_changed': False,
                   'visual_gameplay_verified': False}
-        for name in ('hosted_public_reconnect.py','hosted_public_login.py','hosted_public_instances_fixture.py','hosted_public_home.py',
-                     'private_ship_round_trip.py','private_crew_fixture.py','fixtures/private_ship_crew.java',
-                      'heroic_group_live.py','fixtures/heroic_entry.java'):
-            report['backend_sources'][name]=hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
         if studio_plan is not None:
             report['studio_actions'] = studio_plan
-            report['backend_sources']['studio_actions.py'] = hashlib.sha256(Path(__file__).with_name('studio_actions.py').read_bytes()).hexdigest()
         run(['docker', 'exec', container, 'mkdir', '-m', '700', destination])
         run(['docker', 'cp', str(binary), container + ':' + destination + '/driver'])
         run(['docker', 'exec', container, 'chmod', '700', destination + '/driver'])

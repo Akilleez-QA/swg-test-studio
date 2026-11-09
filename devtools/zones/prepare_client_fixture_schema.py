@@ -17,8 +17,10 @@ import subprocess
 import sys
 import time
 
-REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'devtools/docker'))
+from studio_tool_bundle import TOOLS_ROOT, server_source
+
+REPO = server_source()
+sys.path.insert(0, str(TOOLS_ROOT / 'docker'))
 from disposable_database import validate
 from instance_schema_upgrade import export_sql, sql_script
 

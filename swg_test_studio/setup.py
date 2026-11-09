@@ -4,21 +4,12 @@ import re
 
 from .backend import driver_modules, environment, validate_environment
 from .model import exact
+from .server_tools import source_folder
 from .store import read_json, write_json
 
 
 SETUPS = Path("StarWarsGalaxies/logs/studio-setups")
 PROJECT = re.compile(r"swg-cold-test-[a-f0-9]{8}\Z")
-
-
-def source_folder(path):
-    path = Path(path).resolve()
-    if path.name.casefold() == "src":
-        path = path.parent
-    if not ((path / "src").is_dir() and (path / "devtools/zones/protocol_driver.py").is_file()):
-        raise ValueError("Choose the WhiteNGold server folder that contains src and devtools, or its src folder. "
-                         "If this server checkout has no devtools, run swg-tests.py install-server-tools --source PATH.")
-    return path
 
 
 def saved_source(workspace):

@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from swg_test_studio import docker_runtime
+from swg_test_studio.server_tools import SOURCE_ROOT_ENV, TOOLS_ROOT
 from swg_test_studio.setup import assign_roles, saved_source, select_source
 
 
@@ -15,6 +16,8 @@ class SetupTests(unittest.TestCase):
         def verify(argv, **kwargs):
             output = Path(argv[argv.index("--output") + 1])
             output.write_text('{"ready": true}', encoding="utf-8")
+            self.assertEqual(Path(argv[1]), TOOLS_ROOT / "zones/inspect_client_fixture.py")
+            self.assertEqual(kwargs["env"][SOURCE_ROOT_ENV], str(Path("/source")))
             self.assertGreater(kwargs["timeout"], 30)
             self.assertLessEqual(kwargs["timeout"], 300)
             return SimpleNamespace(returncode=0)
@@ -58,15 +61,15 @@ class SetupTests(unittest.TestCase):
     def test_src_selection_finds_checkout_and_persists_only_source(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder) / "checkout"
-            (root / "src").mkdir(parents=True)
-            tools = root / "devtools/zones"
-            tools.mkdir(parents=True)
-            (tools / "protocol_driver.py").touch()
+            for folder in ("src/engine/server/application/CentralServer", "src/game/server/application/SwgGameServer"):
+                (root / folder).mkdir(parents=True)
+                (root / folder / "Makefile.am").touch()
             workspace = Path(folder) / "workspace"
             self.assertEqual(select_source(workspace, root / "src"), str(root.resolve()))
             self.assertEqual(saved_source(workspace), str(root.resolve()))
-            with self.assertRaisesRegex(ValueError, "contains src and devtools"):
-                select_source(workspace, tools)
+            self.assertFalse((root / "devtools").exists())
+            with self.assertRaisesRegex(ValueError, "WhiteNGold server source"):
+                select_source(workspace, root / "src/engine")
 
     def test_character_names_change_between_suites_without_changing_the_roster(self):
         preferred = {"pilot": "first", "reserve": "newcomer"}

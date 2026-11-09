@@ -17,16 +17,16 @@ class ResultsTests(unittest.TestCase):
             manifest = {"tests": [{"id": name, "kind": "driver_unit"} for name in ("first", "flight", "after")]}
             outputs = iter([(0, "passed\n"), (1, "STUDIO_STEP start 2 land\nSCENARIO_FAILURE Expected hangar\n")])
 
-            def execute(argv, log, timeout):
+            def execute(argv, log, timeout, env):
                 code, output = next(outputs)
                 log.write(output)
                 return code, False
 
-            driver = SimpleNamespace(validate=lambda _: None, source_hashes=dict, command=lambda *args: [],
+            legacy = SimpleNamespace(validate=lambda _: None, source_hashes=dict, command=lambda *args: [],
                                      execute=execute)
             events = []
             with patch.object(backend, "plan", return_value={"manifest": manifest, "bindings": {}}), \
-                    patch.object(backend, "driver_modules", return_value=(None, driver)), \
+                    patch.object(backend, "driver_modules", return_value=(SimpleNamespace(REPO=root), legacy)), \
                     patch.object(backend, "studio_lock", return_value=contextlib.nullcontext()):
                 result = backend.run_suite({"id": "ship_test"}, {"server_checkout": root, "folder": root,
                                                                  "binary": root / "driver"}, root, events.append)

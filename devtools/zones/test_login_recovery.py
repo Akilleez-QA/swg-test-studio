@@ -6,7 +6,9 @@ import re
 import subprocess
 import tempfile
 
-REPO = Path(__file__).resolve().parents[2]
+from studio_tool_bundle import server_source
+
+REPO = server_source()
 
 
 def main(source=None, label="recovery", include_roots=(), native_required=False, gnu_cpp03=False, generated_include_root=None, execution_timeout=10):

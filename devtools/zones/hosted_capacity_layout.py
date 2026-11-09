@@ -9,6 +9,7 @@ import re
 from capacity import REPO
 from hosted_content import inventory
 from instance_scope import load as load_scope
+from studio_tool_bundle import contract_input_sha256
 
 HEADER=REPO/'src/engine/server/library/serverUtility/src/shared/HostedContentContract.h'
 KINDS={'dungeon':1,'private_instance':2,'public_instance':3}
@@ -68,7 +69,7 @@ def contracts(report=None):
     for relative in ('devtools/zones/family_scope.json','devtools/zones/instance_definitions.py',
                      'devtools/zones/hosted_content.py','devtools/zones/template_controller_evidence.py',
                      'devtools/zones/hosted_capacity_layout.py'):
-        inputs[relative]=hashlib.sha256((REPO/relative).read_bytes()).hexdigest()
+        inputs[relative]=contract_input_sha256(REPO,relative)
     types.sort(key=lambda f:(f['definition'],f['family']));slots.sort(key=lambda f:(f['definition'],f['family'],f['row']))
     digest=hashlib.sha256(json.dumps(dict(inputs=inputs,types=types,slots=slots),sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return dict(schema_version=1,types=types,slots=slots,input_sha256=inputs,contract_sha256=digest)

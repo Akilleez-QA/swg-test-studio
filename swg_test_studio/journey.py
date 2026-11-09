@@ -1,6 +1,5 @@
 """Typed single-character radial/dialog journeys using the existing protocol peer."""
 import math
-from pathlib import Path
 import re
 import time
 
@@ -204,16 +203,15 @@ class Journey:
 def run_live(options, env, registry):
     validate(options, [options["role"]])
     from .backend import driver_modules
-    driver_modules(env)
-    import sys
-    tools = Path(env["server_checkout"]) / "devtools/teststudio_server"
-    sys.path.insert(0, str(tools))
-    import retained_peer
-    if Path(retained_peer.__file__).resolve().parent != tools.resolve() or getattr(retained_peer, "PROTOCOL_PEER_VERSION", None) != 1:
+    from .server_tools import load_tool
+
+    driver, _ = driver_modules(env)
+    retained_peer = load_tool("teststudio_server/retained_peer.py")
+    if getattr(retained_peer, "PROTOCOL_PEER_VERSION", None) != 1:
         raise ValueError("Unexpected retained-peer adapter")
-    from protocol_driver import bot_query, complete_ground_arrival
     with retained_peer.open_peer(env["folder"], env["binary"], registry) as peer:
-        engine = Journey(peer, lambda command: bot_query(peer.project, peer.bot, command), complete_arrival=complete_ground_arrival)
+        engine = Journey(peer, lambda command: driver.bot_query(peer.project, peer.bot, command),
+                         complete_arrival=driver.complete_ground_arrival)
         engine.run(options, trace=lambda state, index, label: print(f"STUDIO_STEP {state} {index} {label}", flush=True))
     import hashlib
     result = peer.evidence / "result.json"

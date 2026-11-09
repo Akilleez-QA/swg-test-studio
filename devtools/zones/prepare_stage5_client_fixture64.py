@@ -26,7 +26,8 @@ import hosted_private_instances_fixture
 import hoth_heroic_fixture
 import private_crew_fixture
 import private_group_fixture
-sys.path.insert(0,str(REPO/'devtools/manage'))
+from studio_tool_bundle import TOOLS_ROOT
+sys.path.insert(0,str(TOOLS_ROOT/'manage'))
 from service import operation_lock, update_zone_config
 
 
@@ -183,7 +184,7 @@ def main():
     try:verify_source_inputs(manifest)
     except ValueError as error:parser.error(str(error))
     if args.test_studio_recording:
-        sys.path.insert(0,str(REPO/'devtools/teststudio_server'))
+        sys.path.insert(0,str(TOOLS_ROOT/'teststudio_server'))
         from recording_fixture import supports as supports_recording
         if not supports_recording(manifest):parser.error('Matched Test Studio native/adapter contract required')
     if not 2<=args.ord_capacity<=16384:parser.error('Invalid fixture Ord budget')
@@ -357,7 +358,7 @@ exit;
             if hoth_policy:
                 configs[config]=hoth_heroic_fixture.configure(configs[config],role,hoth_policy)
             if role=='game':
-                sys.path.insert(0,str(REPO/'devtools/teststudio_server'))
+                sys.path.insert(0,str(TOOLS_ROOT/'teststudio_server'))
                 import recording_fixture
                 configs[config]=recording_fixture.configure(configs[config],args.test_studio_recording)
                 recording_fixture.mount(compose['services'][role],folder,args.test_studio_recording)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from capacity import REPO,SERVER_TABLES,SHARED_TABLES,read_table
 from template_controller_evidence import Templates
+from studio_tool_bundle import contract_input_sha256
 
 TABLE=SERVER_TABLES/'buildout/dungeon1/snapshot_portal_restore.tab'
 AREAS=SHARED_TABLES/'buildout/areas_dungeon1.tab'
@@ -78,7 +79,7 @@ def model(repo=REPO):
     inputs=dict(templates.inputs)
     for relative in (TABLE,AREAS,SERVER_TABLES/'dungeon/space_dungeon.tab',Path('devtools/zones/hosted_snapshot_contract.py'),
                      Path('devtools/zones/template_controller_evidence.py')):
-        inputs[relative.as_posix()]=hashlib.sha256((repo/relative).read_bytes()).hexdigest()
+        inputs[relative.as_posix()]=contract_input_sha256(repo,relative)
     roots.sort(key=lambda r:(r['definition'],r['family'],r['snapshot_id']))
     digest=hashlib.sha256(json.dumps(dict(roots=roots,inputs=inputs),sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return dict(schema_version=1,roots=roots,input_sha256=inputs,contract_sha256=digest)
