@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 
+from .groups import validate_groups
 from .model import ROLE, exact, identifier, validate
 from .store import EXAMPLES, read_json, write_json
 
@@ -46,7 +47,8 @@ def validate_entry(suite):
 
 
 def validate_collection(data):
-    exact(data, ("format", "schema_version", "title", "suites"), "collection")
+    optional = ("groups",) if isinstance(data, dict) and "groups" in data else ()
+    exact(data, ("format", "schema_version", "title", "suites", *optional), "collection")
     if (data["format"] != FORMAT or type(data["schema_version"]) is not int or
             data["schema_version"] != 1 or not isinstance(data["title"], str) or
             not 1 <= len(data["title"]) <= 200):
@@ -60,6 +62,8 @@ def validate_collection(data):
         if suite["id"] in ids:
             raise ValueError("Duplicate collection suite ID: " + suite["id"])
         ids.add(suite["id"])
+    if optional:
+        validate_groups(data["groups"], ids)
     return data
 
 
@@ -89,6 +93,18 @@ class Collection:
             if suite["id"] == name:
                 return suite
         raise ValueError("Unknown collection suite: " + name)
+
+    def groups(self):
+        return self.read().get("groups", {})
+
+    def save_groups(self, groups):
+        validate_groups(groups)
+        data = self.read()
+        if groups:
+            data["groups"] = groups
+        else:
+            data.pop("groups", None)
+        return self.write(data, replace=True)
 
     def save(self, value, *, replace=False):
         suite = validate_entry(value)

@@ -113,6 +113,8 @@ def studio_lock(workspace):
 
 
 def run_suite(suite, env, workspace, emit=print):
+    from .results import failed_action, failure_reason, log_tail
+
     selected = plan(suite, env)
     driver, legacy = driver_modules(env)
     manifest = selected["manifest"]
@@ -134,6 +136,7 @@ def run_suite(suite, env, workspace, emit=print):
                   "application_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                          for p in Path(__file__).parent.glob("*.py")}}
         try:
+            emit({"event": "run_preparing", "operation": operation, "cases": len(manifest["tests"])})
             report["source_hashes"] = legacy.source_hashes()
             root = Path(env["server_checkout"])
             report["studio_adapter_sha256"] = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in (
@@ -143,12 +146,13 @@ def run_suite(suite, env, workspace, emit=print):
             for case in manifest["tests"]:
                 started = time.monotonic()
                 row = {"id": case["id"], "kind": case["kind"], "passed": False}
+                case_log = output / (case["id"] + ".log")
                 report["cases"].append(row)
                 emit({"event": "case_started", "id": case["id"], "operation": operation})
                 try:
                     if case["kind"] == "studio_journey":
                         from .journey import run_live
-                        with (output / (case["id"] + ".log")).open("x") as log, contextlib.redirect_stdout(log):
+                        with case_log.open("x") as log, contextlib.redirect_stdout(log):
                             row["artifact"] = run_live(case["options"], env, selected["bindings"][case["options"]["role"]])
                         row.update(exit_code=0, timed_out=False, passed=True)
                     else:
@@ -157,13 +161,19 @@ def run_suite(suite, env, workspace, emit=print):
                             argv = command(case["options"], env, selected["bindings"], output, case["id"])
                         else:
                             argv = legacy.command(case, selected["bindings"], Path(env["folder"]), Path(env["binary"]))
-                        with (output / (case["id"] + ".log")).open("x") as log:
+                        with case_log.open("x") as log:
                             code, timed_out = legacy.execute(argv, log, timeout=2400)
                         row.update(exit_code=code, timed_out=timed_out, passed=code == 0 and not timed_out)
                         if row["passed"] and case["kind"] != "driver_unit":
-                            row["artifact"] = legacy.runtime_artifact(output / (case["id"] + ".log"), Path(env["folder"]))
+                            row["artifact"] = legacy.runtime_artifact(case_log, Path(env["folder"]))
                 except (Exception, KeyboardInterrupt) as exc:
                     row.update(passed=False, error=type(exc).__name__ + ": " + str(exc))
+                if not row["passed"]:
+                    log = log_tail(case_log)
+                    row["error"] = failure_reason(row, log)
+                    action = failed_action(log)
+                    if action:
+                        row["action"] = action
                 row["seconds"] = time.monotonic() - started
                 emit({"event": "case_finished", **row})
                 if not row["passed"]:

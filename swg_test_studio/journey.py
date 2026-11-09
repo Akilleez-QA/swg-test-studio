@@ -70,11 +70,14 @@ class Journey:
         self.peer, self.query, self.clock, self.sleep = peer, query, clock, sleep
         self.complete_arrival = complete_arrival
 
-    def run(self, options):
+    def run(self, options, *, trace=None):
         validate(options, [options["role"]])
         if options["prepare_start"]:
             self.prepare(options["actions"][0]["source"])
         for index, action in enumerate(options["actions"]):
+            label = "cancel_shuttle" if action["answer"] == "cancel" else "confirm_shuttle"
+            if trace:
+                trace("start", index + 1, label)
             if index and options.get("prepare_between_actions", False):
                 row = self.row()
                 if (not matches(row, action["source"]) or row.get("group") not in ("null", "0") or
@@ -82,6 +85,8 @@ class Journey:
                     raise RuntimeError("Between-action setup requires the expected solo, quiet source")
                 self.position()
             self.action(action)
+            if trace:
+                trace("pass", index + 1, label)
 
     def row(self):
         row = self.peer.row()
@@ -209,7 +214,7 @@ def run_live(options, env, registry):
     from protocol_driver import bot_query, complete_ground_arrival
     with retained_peer.open_peer(env["folder"], env["binary"], registry) as peer:
         engine = Journey(peer, lambda command: bot_query(peer.project, peer.bot, command), complete_arrival=complete_ground_arrival)
-        engine.run(options)
+        engine.run(options, trace=lambda state, index, label: print(f"STUDIO_STEP {state} {index} {label}", flush=True))
     import hashlib
     result = peer.evidence / "result.json"
     return {"path": str(result), "sha256": hashlib.sha256(result.read_bytes()).hexdigest()}

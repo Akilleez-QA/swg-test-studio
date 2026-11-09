@@ -9,11 +9,12 @@ import xml.etree.ElementTree as ET
 
 from .backend import environment, plan, studio_lock, validate_environment
 from .collection import FORMAT, Collection, is_driver_suite
-from .model import exact, identifier
+from .model import exact, identifier, validate
 from .store import read_json, write_json
 
 
 MAX_JOBS = 8
+MAX_RUNS = 64
 
 
 def batch_template():
@@ -30,8 +31,8 @@ def prepare_batch(path, library):
     if type(data["schema_version"]) is not int or data["schema_version"] != 1:
         raise ValueError("Unsupported batch version")
     runs = data["runs"]
-    if not isinstance(runs, list) or not 1 <= len(runs) <= 64:
-        raise ValueError("A batch needs 1–64 explicitly selected runs")
+    if not isinstance(runs, list) or not 1 <= len(runs) <= MAX_RUNS:
+        raise ValueError(f"A batch needs 1–{MAX_RUNS} explicitly selected runs")
     prepared = []
     seen = set()
     for entry in runs:
@@ -160,3 +161,42 @@ def run_batch(prepared, workspace, workers, emit):
         emit({"event": "batch_started", "runs": len(prepared), "max_workers": workers, "evidence": str(root)})
         completed = schedule(prepared, workers, lambda job: run_one(root, job), results, emit)
         return write_report(root, prepared, results, completed, workers)
+
+
+def run_selected(names, library, workspace, *, project=None, profile=None, keep_running=False, emit,
+                 source=None, run_workspace=None):
+    """Run checked suites in order under one managed test server lifecycle."""
+    from .docker_runtime import active_server, plain_login
+    from .setup import automatic_environment, creation_roles
+
+    if not 1 <= len(names) <= MAX_RUNS or len(set(names)) != len(names):
+        raise ValueError(f"Select 1–{MAX_RUNS} distinct Studio tests.")
+    suites = [library.get(name) for name in names]
+    for suite in suites:
+        if is_driver_suite(suite):
+            raise ValueError(f"{suite['title']} uses the SWG server test tools.")
+        validate(suite, runnable=True)
+    prepared, reserved = [], set()
+    for suite in suites:
+        creates = creation_roles(suite)
+        env = profile if profile is not None else automatic_environment(
+            workspace, suite["roles"], project=project, creation_roles=creates, source=source)
+        plan(suite, env)
+        targets = {env["bindings"][role] for role in creates}
+        if reserved & targets:
+            raise ValueError("The selected character-creation tests would reuse a single free slot. Run them separately.")
+        reserved.update(targets)
+        prepared.append({"id": suite["id"], "suite": suite, "env": env, "scopes": set()})
+
+    run_workspace = workspace if run_workspace is None else run_workspace
+    live = [job for job in prepared if job["suite"]["roles"]]
+    if profile is not None or not live:
+        return run_batch(prepared, run_workspace, 1, emit)
+    login_only = all(plain_login(job["suite"]) for job in live)
+    server = live[0]["env"]
+    if login_only:
+        # Readiness must cover all of the exact saved hosts in this selection.
+        bindings = {key: key for job in live for key in job["env"]["bindings"].values()}
+        server = dict(server, bindings=bindings)
+    with active_server(server, keep_running=keep_running, emit=emit, login_only=login_only):
+        return run_batch(prepared, run_workspace, 1, emit)

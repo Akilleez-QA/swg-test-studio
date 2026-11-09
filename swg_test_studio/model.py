@@ -141,9 +141,11 @@ def compile_suite(data, legacy_dir):
             original = loads((legacy_dir / (options["suite"] + ".json")).read_text(encoding="utf-8"))
             if original["roles"] != list(RECIPES[options["suite"]]):
                 raise ValueError("Bundled recipe role contract changed")
+            # Role-free runs can overlap live runs, so they must only execute the offline unit backend.
+            allowed = {"driver_unit"} if options["suite"] == "driver_unit" else {
+                "protocol_session", "ship_group", "driver_unit", "group_affinity_rryatt", "group_affinity_ord"}
             for case in original["tests"]:
                 # Do not inherit newly added native/fault backends through an approved suite name.
-                allowed = {"protocol_session", "ship_group", "driver_unit", "group_affinity_rryatt", "group_affinity_ord"}
                 if case["kind"] not in allowed:
                     raise ValueError("Bundled recipe gained an unsupported backend; review its adapter")
                 case = copy.deepcopy(case)

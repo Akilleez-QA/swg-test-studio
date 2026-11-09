@@ -86,8 +86,8 @@ def register_setup(path, *, replace=False):
     return destination
 
 
-def available_setups(workspace):
-    saved = saved_source(workspace)
+def available_setups(workspace, *, source=None):
+    saved = source if source is not None else saved_source(workspace)
     if not saved:
         raise ValueError("Choose the SWG source folder first.")
     source = source_folder(saved)
@@ -126,7 +126,8 @@ def assign_roles(preferred, roster, roles, *, creation_roles=()):
         key = next((key for key, existing in roster.items() if existing == ready and key not in used), None)
         if key is None:
             if not ready:
-                raise ValueError("This test creates a character, but this test server has no unused character slot.")
+                raise ValueError("This test needs a free slot to create a new character. "
+                                 "Choose the Login and relogin example to use a character already set up.")
             count = len(set(roles) - creation_roles)
             raise ValueError(f"This test needs {count} prepared test characters. "
                              f"This server has {sum(roster.values())} available for Studio.")
@@ -135,8 +136,8 @@ def assign_roles(preferred, roster, roles, *, creation_roles=()):
     return {role: assigned[role] for role in roles}
 
 
-def automatic_environment(workspace, roles, *, project=None, creation_roles=(), recording=False):
-    registered = available_setups(workspace)
+def automatic_environment(workspace, roles, *, project=None, creation_roles=(), recording=False, source=None):
+    registered = available_setups(workspace, source=source)
     if not project and len(registered) == 1:
         project = next(iter(registered))
     if project not in registered:

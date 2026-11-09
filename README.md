@@ -83,7 +83,58 @@ collections in version control and bring forward your additions separately.
 python3 swg-tests.py export-regression --server-checkout /path/to/whitengold --output swg-regression-new.json
 ```
 
+## Organize and run groups
+
+In **Library**, use **New group** and drag tests onto group rows. Open or
+collapse a group with its disclosure arrow. Drop a test onto **Ungrouped**
+to take it out of a group. Removing a group returns its tests to Ungrouped.
+Groups are stored in the open collection or in the local Library workspace.
+
+Right-click a test in **Library**, or focus it and press **Shift+F10**, to open
+its actions. **Run this test** and **Preview run** use that saved test without
+changing the editor or the checked tests. Use the same menu to open, validate,
+export, or move the test to a group. **Remove from Studio** hides the test
+without deleting its file. Turn on **Show removed tests** to restore it.
+
+Click a checkbox in the **Run** column to check a whole group or an
+individual test. A partially checked group shows a mixed checkbox. You can
+check tests across multiple groups and use **Run selected** to run exactly
+that selection. Server tests still use the original SWG server tools.
+
+Selected Studio tests share one Docker server startup and run in Library
+order. **Run & Results** shows elapsed time and completed tests. The Library
+shows a spinner for the active test, a green check on pass, and a red X on
+failure. The run retains combined and per-test reports.
+
+For a failed test, right-click it in **Library** and choose **View latest
+result**. From **Run & Results**, select a run and click **View test
+results**. The viewer opens on the first failed step and shows its reason,
+log, and file location. Tests with recorded shuttle, launch, landing, or
+group actions also identify the failed action when the run captured it.
+**Open saved report** can reopen a `result.json` or `batch-result.json`
+from an earlier run. Keep the report alongside its logs.
+
+The same selection can be called from CI by listing the test IDs:
+
+```bash
+python3 swg-tests.py --collection swg-regression-collection.json run-selected \
+  --suite login_relogin --suite ord_round_trip --environment environment.json
+```
+
 ## Run suites concurrently
+
+From **Library** or **Edit**, submit another run while a test is active. Studio
+starts compatible runs immediately and queues tests that share a Docker test
+server or source checkout. A driver unit test can run alongside gameplay
+because it uses no characters. For parallel gameplay, choose a different
+source checkout and its own prepared Docker test server before submitting.
+Studio retains the source, server, and test selection from each submission.
+Use the **Run** selector in **Run & Results** to see each run’s progress and
+reports separately. The desktop starts up to eight operations at a time.
+Desktop evidence is grouped under `desktop-runs/` in the Studio workspace.
+In **Library**, each test’s **Result** column shows its spinner, green check,
+or red X. Click a group’s disclosure arrow or double-click its name to expand
+or collapse it.
 
 In **Run & Results**, select **Save batch template**, fill in each run's suite
 ID and environment filename, then choose **Preview batch** or **Run batch**.
@@ -115,8 +166,10 @@ with the WSL distribution used by Studio (`Ubuntu-24.04` by default).
 
 1. Click **Choose source folder** and select the SWG checkout or its `src`
    folder. Studio remembers it and finds verified Docker test servers.
-2. Use the suggested server or select a different verified server from the
-   list. Studio picks prepared test characters for the selected test.
+2. Click **Find or start test server** to refresh the list. If no verified
+   server is running, Studio starts one prepared server and leaves it
+   available for testing. Select another verified server if needed.
+   Studio picks prepared test characters for the selected test.
 3. Click **Preview run** or **Run**. If Studio starts a stopped server, it
    stops its game containers when the run finishes, unless **Keep test server
    running** is selected. A server that was already running is reused.

@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 from .backend import environment, environment_template, plan, run_suite
-from .batch import MAX_JOBS, batch_template, prepare_batch, run_batch
+from .batch import MAX_JOBS, batch_template, prepare_batch, run_batch, run_selected
 from .collection import Collection, export_regression, is_driver_suite
 from .setup import automatic_environment, creation_roles, register_setup, select_source
 from .model import loads, validate
@@ -33,7 +33,7 @@ def windows_relay(args, workspace):
         forwarded[0:0] = ["--workspace", linux(workspace)]
     for index, argument in enumerate(forwarded):
         option, separator, value = argument.partition("=")
-        if option in ("--workspace", "--environment", "--collection", "--file", "--source"):
+        if option in ("--workspace", "--run-workspace", "--environment", "--collection", "--file", "--source"):
             if separator:
                 forwarded[index] = option + "=" + linux(value)
             else:
@@ -45,6 +45,7 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(description="SWG Test Studio — desktop, saved driver suites and fixture recording")
     parser.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE)
+    parser.add_argument("--run-workspace", type=Path, help="Separate output folder for an independent run")
     parser.add_argument("--collection", type=Path, help="Use an editable Studio collection JSON")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("gui", help="Open the local graphical application")
@@ -66,9 +67,11 @@ def main(argv=None):
         target.add_argument("--test-server", help="Choose a verified Docker test server for the saved source folder")
         if action == "run":
             child.add_argument("--keep-running", action="store_true")
+            child.add_argument("--source", type=Path, help="Use this source folder instead of the saved selection")
     child = commands.add_parser("select-source", help="Choose the SWG source folder")
     child.add_argument("--source", type=Path, required=True)
-    commands.add_parser("test-servers", help="List verified Docker test servers for the selected source")
+    child = commands.add_parser("test-servers", help="List verified Docker test servers for the selected source")
+    child.add_argument("--start", action="store_true", help="Start a verified server if none are running")
     child = commands.add_parser("register-test-server", help="Connect an already prepared test server to its source")
     child.add_argument("--environment", type=Path, required=True)
     child.add_argument("--replace", action="store_true")
@@ -78,11 +81,19 @@ def main(argv=None):
         child = commands.add_parser(action, help="Preview or run a batch of Studio suites")
         child.add_argument("--file", type=Path, required=True)
         child.add_argument("--jobs", type=int, default=1, choices=range(1, MAX_JOBS + 1))
+    child = commands.add_parser("run-selected", help="Run an ordered selection of Studio tests")
+    child.add_argument("--suite", action="append", required=True, help="Test ID. Repeat for each selected test.")
+    target = child.add_mutually_exclusive_group()
+    target.add_argument("--environment", type=Path, help="Explicit CI or test-operator profile")
+    target.add_argument("--test-server", help="Choose a verified Docker test server for the saved source folder")
+    child.add_argument("--keep-running", action="store_true")
+    child.add_argument("--source", type=Path, help="Use this source folder instead of the saved selection")
     commands.add_parser("environment-template", help="Print an editable environment example (contains no credentials)")
     child = commands.add_parser("record-start")
     target = child.add_mutually_exclusive_group()
     target.add_argument("--environment", type=Path)
     target.add_argument("--test-server")
+    child.add_argument("--source", type=Path, help="Use this source folder instead of the saved selection")
     child.add_argument("--role", action="append", required=True)
     child.add_argument("--seconds", type=int, default=600)
     for action in ("record-status", "record-stop", "record-draft"):
@@ -97,7 +108,7 @@ def main(argv=None):
         from .gui import launch
         launch(args.workspace, args.collection)
         return 0
-    linux_commands = ("run", "plan-batch", "run-batch", "select-source", "test-servers",
+    linux_commands = ("run", "run-selected", "plan-batch", "run-batch", "select-source", "test-servers",
                       "register-test-server", "docker-check")
     if os.name == "nt" and (args.command in linux_commands or args.command.startswith("record-") or
                             args.command == "plan" and not args.environment):
@@ -107,6 +118,7 @@ def main(argv=None):
             emit({"event": "error", "error": "Studio needs its WSL Linux environment and Docker Desktop integration on Windows."})
             return 1
     library = Collection(args.collection) if args.collection else Library(args.workspace)
+    run_workspace = args.run_workspace or args.workspace
     try:
         if args.command == "list":
             emit({"suites": library.list()})
@@ -130,11 +142,11 @@ def main(argv=None):
             from .docker_runtime import list_servers
             source = select_source(args.workspace, args.source) if args.command == "select-source" else None
             try:
-                servers = list_servers(args.workspace)
+                servers = list_servers(args.workspace, start_if_needed=args.command == "test-servers" and args.start,
+                                       emit=emit)
             except (ValueError, OSError) as exc:
-                if source is None:
-                    raise
                 emit({"event": "test_servers", "source": source, "servers": [], "message": str(exc)})
+                return int(source is None)
             else:
                 emit({"event": "test_servers", "source": source, "servers": servers})
         elif args.command == "register-test-server":
@@ -146,6 +158,13 @@ def main(argv=None):
             return int(not result["passed"])
         elif args.command == "batch-template":
             emit(batch_template())
+        elif args.command == "run-selected":
+            profile = environment(args.environment) if args.environment else None
+            result = run_selected(args.suite, library, args.workspace, project=args.test_server,
+                                  profile=profile, keep_running=args.keep_running, emit=emit,
+                                  source=args.source, run_workspace=run_workspace)
+            emit(result)
+            return 130 if result["interrupted"] else int(not result["passed"])
         elif args.command in ("plan-batch", "run-batch"):
             prepared = prepare_batch(args.file, library)
             if args.command == "plan-batch":
@@ -154,7 +173,7 @@ def main(argv=None):
                      "exclusive_scopes": dict(job["scopes"])} for job in prepared
                 ]})
             else:
-                result = run_batch(prepared, args.workspace, args.jobs, emit)
+                result = run_batch(prepared, run_workspace, args.jobs, emit)
                 emit(result)
                 return 130 if result["interrupted"] else int(not result["passed"])
         elif args.command in ("plan", "run"):
@@ -162,16 +181,17 @@ def main(argv=None):
             if is_driver_suite(suite):
                 raise ValueError("Driver manifests use the original server test harness. Select a Studio test for replay.")
             env = environment(args.environment) if args.environment else automatic_environment(
-                args.workspace, suite["roles"], project=args.test_server, creation_roles=creation_roles(suite))
+                args.workspace, suite["roles"], project=args.test_server, creation_roles=creation_roles(suite),
+                source=getattr(args, "source", None))
             if args.command == "plan":
                 emit(plan(suite, env))
             else:
                 if args.environment or not suite["roles"]:
-                    result = run_suite(suite, env, args.workspace, emit)
+                    result = run_suite(suite, env, run_workspace, emit)
                 else:
-                    from .docker_runtime import active_server
-                    with active_server(env, keep_running=args.keep_running, emit=emit):
-                        result = run_suite(suite, env, args.workspace, emit)
+                    from .docker_runtime import active_server, plain_login
+                    with active_server(env, keep_running=args.keep_running, emit=emit, login_only=plain_login(suite)):
+                        result = run_suite(suite, env, run_workspace, emit)
                 emit(result)
                 return 0 if result["passed"] else 1
         else:
@@ -181,7 +201,8 @@ def main(argv=None):
                     result = recording.start(environment(args.environment), args.workspace, args.role, args.seconds)
                 else:
                     from .docker_runtime import active_server
-                    env = automatic_environment(args.workspace, args.role, project=args.test_server, recording=True)
+                    env = automatic_environment(args.workspace, args.role, project=args.test_server,
+                                                recording=True, source=args.source)
                     with active_server(env, keep_running=True, emit=emit):
                         result = recording.start(env, args.workspace, args.role, args.seconds)
             elif args.command == "record-status":

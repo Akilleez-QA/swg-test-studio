@@ -1,6 +1,7 @@
 """Docker operations restricted to a registered SWG test server."""
 import contextlib
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -13,10 +14,16 @@ import time
 from .setup import available_setups, checked_setup
 from .store import read_json
 
+REUSE_ROLES = ("chat", "local_chat", "game")
+STOPPED = {"created", "exited"}
+
 
 def docker(*args, timeout=60):
     try:
-        result = subprocess.run(["docker", *args], capture_output=True, text=True, timeout=timeout)
+        # Explicit fixture Compose commands must not inherit unrelated project options.
+        env = {key: value for key, value in os.environ.items() if not key.startswith("COMPOSE_")} if args[0] == "compose" else None
+        result = subprocess.run(["docker", *args], capture_output=True, text=True, errors="replace",
+                                timeout=timeout, env=env)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         raise ValueError("Studio requires Docker. Install Docker, start it, and try again.") from exc
     if result.returncode:
@@ -35,7 +42,7 @@ def require_docker():
     docker("version", "--format", "{{.Server.Version}}", timeout=10)
 
 
-def container_set(env):
+def container_set(env, *, during_start=False):
     driver, folder, root, volume, schema, stage, roster = checked_setup(env)
     release = read_json(Path(env["server_checkout"]) / "StarWarsGalaxies/instance-release.json")
     pins = release["roles"]
@@ -59,7 +66,7 @@ def container_set(env):
                                            "starwarsgalaxies/local-chat:local").strip()):
                 raise ValueError("This Docker test server has an unexpected private chat image.")
         rows[role] = row
-    if set(rows) != expected:
+    if set(rows) != expected and not during_start:
         raise ValueError("This Docker test server is incomplete. Ask the test server maintainer to prepare it.")
     driver.validate(rows["oracle"], root, volume)
     if rows["oracle"]["State"].get("Running") is not True:
@@ -67,28 +74,41 @@ def container_set(env):
     state = {row["State"]["Status"] for role, row in rows.items() if role != "oracle"}
     if state == {"running"}:
         status = "Running"
-    elif state <= {"created", "exited"}:
+    elif state <= STOPPED:
         status = "Stopped"
+    elif during_start:
+        status = "Starting"
+    elif (state <= STOPPED | {"running"} and
+          all(rows[role]["State"]["Status"] in STOPPED for role in ("central", "taskmanager"))):
+        status = "Needs startup"
     else:
         raise ValueError("This Docker test server is partly started. Ask its maintainer to check it.")
     return driver, folder, rows, status, stage, roster
 
 
-def list_servers(workspace):
+def list_servers(workspace, *, start_if_needed=False, emit=print):
     require_docker()
     registered = available_setups(workspace)
     servers = []
+    rejected = []
     for project, env in registered.items():
         try:
             _, _, _, state, stage, roster = container_set(env)
-        except (OSError, RuntimeError, ValueError, KeyError, ImportError):
+        except (OSError, RuntimeError, ValueError, KeyError, ImportError) as exc:
+            reason = str(exc) if isinstance(exc, ValueError) else "Could not read or verify its prepared setup."
+            rejected.append(f"{project} · {reason}")
             continue
         servers.append({"id": project, "name": env["name"], "state": state,
                         "characters": sum(roster.values()), "recording": bool(stage.get("test_studio_recording"))})
     if not servers:
-        raise ValueError("No verified Docker test server is available for this source. "
-                         "Ask the test server maintainer to check the installation.")
-    return sorted(servers, key=lambda server: (server["state"] != "Running", server["name"]))
+        raise ValueError("No verified Docker test server is available. " + " ".join(rejected))
+    servers.sort(key=lambda server: (server["state"] != "Running", server["name"], server["id"]))
+    if start_if_needed and servers[0]["state"] != "Running":
+        # Reuse an existing verified server and retain it for the next Run.
+        server = servers[0]
+        with active_server(registered[server["id"]], keep_running=True, emit=emit):
+            server["state"] = "Running"
+    return servers
 
 
 def wait_for_login(rows, project):
@@ -137,23 +157,124 @@ def prepare_restart(driver, folder, rows, stage):
 
 def wait_for_preload(driver, folder):
     verifier = driver.REPO / "devtools/zones/inspect_client_fixture.py"
-    deadline = time.monotonic() + 300
+    deadline = time.monotonic() + 480
+    detail = ""
     with tempfile.TemporaryDirectory(prefix="swg-studio-ready-") as directory:
         for attempt in range(60):
-            if time.monotonic() >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
             output = Path(directory) / f"ready-{attempt}.json"
             try:
                 result = subprocess.run(
                     [sys.executable, str(verifier), "--folder", str(folder), "--output", str(output),
                      "--stage5", "--expected-instances", "1"],
-                    stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+                    stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace",
+                    timeout=min(300, remaining))
             except subprocess.TimeoutExpired:
+                detail = "The native readiness check timed out."
                 continue
-            if result.returncode == 0 and output.is_file() and read_json(output).get("ready") is True:
-                return
+            if output.is_file():
+                report = read_json(output)
+                if result.returncode == 0 and report.get("ready") is True:
+                    return
+                running = [row for row in report["instances"] if row["state"] not in ("stopped", "retired")]
+                ready = sum(row["ready"] == "1" for row in running)
+                detail = f"{ready} of {len(running)} active game instances reported ready."
+            elif "Fresh native content snapshot unavailable" in result.stderr:
+                detail = "The game servers did not return a complete readiness snapshot."
             time.sleep(5)
-    raise ValueError("The Docker test server logged in, but its game worlds did not finish loading.")
+    raise ValueError("Login was ready, but the game-world checks did not pass. " + detail)
+
+
+def wait_for_login_hosts(driver, folder, central, bindings):
+    """Require native readiness for the exact saved hosts used by plain login tests."""
+    from inspect_client_fixture import rows
+
+    project, schema, _ = driver.fixture(folder)
+    hosts = set()
+    for key in bindings.values():
+        bot = driver.identity(read_json(folder / "protocol-driver" / (key + ".json")))
+        saved = driver.saved(project, schema, bot["player"])
+        hosts.add((saved["scene"], saved["instance"]))
+
+    def query(name):
+        return rows(docker("exec", central, "/fixture/client-console", "127.0.0.1", name, timeout=15))
+
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        try:
+            scenes = {(row["scene"], row["instance"]) for row in query("capacityScenes")
+                      if row["connected"] == "1" and row["preload"] == "finished" and row["heartbeat_fresh"] == "1"}
+            worlds = {(row["definition"], row["instance"]) for row in query("capacityInstances")
+                      if row["state"] == "running" and row["ready"] == "1"}
+            if hosts <= scenes and all(instance == "0" or (scene, instance) in worlds for scene, instance in hosts):
+                return
+        except (RuntimeError, ValueError):
+            pass
+        time.sleep(3)
+    raise ValueError("Login is ready, but the test characters’ saved worlds did not finish loading.")
+
+
+def plain_login(suite):
+    return all(step["action"] == "session" and set(step["options"]) == {"role"} for step in suite["steps"])
+
+
+def verified_compose(folder, rows, directory):
+    runtime = folder / "runtime"
+    project = folder.parent.name
+    original = runtime / "compose.json"
+    if original.resolve(strict=True) != original:
+        raise ValueError("The prepared test server configuration is no longer in its expected location.")
+    # Use one private copy for both the comparison and the start.
+    config = directory / "compose.json"
+    config.write_bytes(original.read_bytes())
+    definition = read_json(config)
+    if (definition.get("name") != project or set(definition["services"]) != set(rows) or
+            definition.get("volumes") != {"oracle_data": {"external": True, "name": project + "_oracle26_data"}}):
+        raise ValueError("The saved Docker settings do not match this isolated test server.")
+    network_names = {project + "_" + key for key in definition["networks"]}
+    attached = {name for row in rows.values() for name in row["NetworkSettings"]["Networks"]}
+    if network_names != attached or any(
+            options.get("external") or options.get("name", project + "_" + key) != project + "_" + key
+            for key, options in definition["networks"].items()):
+        raise ValueError("The test server configuration names an unexpected network.")
+    for key in definition["networks"]:
+        name = project + "_" + key
+        labels = docker("network", "inspect", "--format", "{{json .Labels}}", name)
+        labels = json.loads(labels)
+        if labels.get("com.docker.compose.project") != project or labels.get("com.docker.compose.network") != key:
+            raise ValueError("An expected test-server network could not be verified.")
+    compose = ("compose", "--project-name", project, "--project-directory", str(runtime),
+               "--env-file", "/dev/null", "-f", str(config))
+    hashes = dict(line.split() for line in docker(*compose, "config", "--hash=*").splitlines())
+    roles = [role for role in rows if role not in ("oracle", *REUSE_ROLES)]
+    for role in roles:
+        row = rows[role]
+        service = definition["services"][role]
+        image = row["Config"]["Image"]
+        if (not re.fullmatch(r"starwarsgalaxies/" + role + r":[A-Za-z0-9_.-]+", image) or
+                service.get("image") != image or service.get("build") or
+                hashes.get(role) != row["Config"]["Labels"].get("com.docker.compose.config-hash") or
+                not re.fullmatch("[a-f0-9]{64}", hashes.get(role, "")) or
+                docker("image", "inspect", "--format", "{{.Id}}", image).strip() != row["Image"]):
+            raise ValueError(f"The saved settings or image for {role} differ from the verified test container.")
+    return compose, roles
+
+
+def recreate_games(env, folder, rows):
+    with tempfile.TemporaryDirectory(prefix="swg-studio-restart-") as temporary:
+        directory = Path(temporary)
+        compose, roles = verified_compose(folder, rows, directory)
+        # Keep the installed test-only Java helpers and the chat sidecar's
+        # container network attachment.
+        for role in REUSE_ROLES:
+            docker("start", rows[role]["Id"])
+        start = (*compose, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--force-recreate")
+        docker(*start, *(role for role in roles if role != "login"), timeout=180)
+        docker(*start, "login", timeout=120)
+        _, _, current, _, _, _ = container_set(env, during_start=True)
+        return current
 
 
 def stop_started(rows, started):
@@ -166,8 +287,21 @@ def stop_started(rows, started):
         docker("stop", "--time", "90", *remaining, timeout=120)
 
 
+def finish_incomplete_shutdown(rows):
+    """Only finish a partial shutdown if the coordinator and game processes are gone."""
+    workers = {"game": "SwgGameServer", "planet": "PlanetServer", "connection": "ConnectionServer"}
+    running = [role for role, row in rows.items() if role != "oracle" and row["State"]["Running"]]
+    for role, binary in workers.items():
+        if role in running:
+            processes = docker("top", rows[role]["Id"], "-eo", "pid,args")
+            if re.search(r"\b" + binary + r"\b", processes):
+                raise ValueError(f"The test server is partly stopped but {binary} is still active. "
+                                 "Studio needs its workers to finish shutting down before restarting.")
+    stop_started(rows, running)
+
+
 @contextlib.contextmanager
-def active_server(env, *, keep_running, emit):
+def active_server(env, *, keep_running, emit, login_only=False):
     require_docker()
     driver, folder, _, _, _, _ = container_set(env)
     lock = driver.REPO / "StarWarsGalaxies"
@@ -176,25 +310,35 @@ def active_server(env, *, keep_running, emit):
         _, _, rows, state, stage, _ = container_set(env)
         project = folder.parent.name
         emit({"event": "test_server", "state": state, "project": project})
+        if state == "Needs startup":
+            emit({"event": "test_server", "state": "Finishing shutdown", "project": project})
+            finish_incomplete_shutdown(rows)
+            _, _, rows, state, stage, _ = container_set(env)
+            if state != "Stopped":
+                raise ValueError("The test server did not finish shutting down.")
         if state == "Stopped":
             try:
                 emit({"event": "test_server", "state": "Preparing", "project": project})
                 prepare_restart(driver, folder, rows, stage)
-                # Role containers were fully identified above. No Compose recreation or image pull.
-                for role in ("log", "taskmanager", "database", "chat", "local_chat", "planet", "game",
-                             "connection", "metrics", "commodities", "central", "login"):
-                    started.append(role)
-                    docker("start", rows[role]["Id"])
+                started = [role for role in rows if role != "oracle"]
+                rows = recreate_games(env, folder, rows)
                 emit({"event": "test_server", "state": "Loading", "project": project})
                 wait_for_login(rows, project)
                 driver.fixture(folder)
-                wait_for_preload(driver, folder)
+                if login_only:
+                    wait_for_login_hosts(driver, folder, rows["central"]["Id"], env["bindings"])
+                else:
+                    wait_for_preload(driver, folder)
                 emit({"event": "test_server", "state": "Ready", "project": project})
             except BaseException:
-                stop_started(rows, started)
+                if started:
+                    _, _, current, _, _, _ = container_set(env, during_start=True)
+                    stop_started(current, [role for role in started if role in current and current[role]["State"]["Running"]])
                 raise
         else:
             driver.fixture(folder)
+            if login_only:
+                wait_for_login_hosts(driver, folder, rows["central"]["Id"], env["bindings"])
     try:
         yield
     finally:
