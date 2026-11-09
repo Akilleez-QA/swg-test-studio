@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "stage7_game_supervisor_stop",
+  "title": "Game supervisor loss at the distributed StopGames boundary",
+  "category": "system",
+  "roles": ["leader", "member"],
+  "tests": [
+    {"id": "driver_guards", "kind": "driver_unit", "options": {}},
+    {"id": "service_signal_guards", "kind": "native_gate", "options": {"gate": "retirement_fault_services"}},
+    {"id": "rryatt_game_supervisor_loss", "kind": "retirement_game_supervisor_stopping_games",
+     "options": {"leader": "leader", "member": "member", "family": "rryatt"}},
+    {"id": "falcon_game_supervisor_loss", "kind": "retirement_game_supervisor_stopping_games",
+     "options": {"leader": "leader", "member": "member", "family": "falcon"}},
+    {"id": "ord_game_supervisor_loss", "kind": "retirement_game_supervisor_stopping_games",
+     "options": {"leader": "leader", "member": "member", "family": "ord"}}
+  ]
+}

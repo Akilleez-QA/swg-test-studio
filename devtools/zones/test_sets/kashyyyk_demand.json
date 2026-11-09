@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_demand",
+  "title": "Complete Rryatt demand worlds, linked guides, group affinity and saved login",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "demand_guards",
+      "kind": "native_gate",
+      "options": {
+        "gate": "rryatt_demand"
+      }
+    },
+    {
+      "id": "complete_set_growth_group_and_reconnect",
+      "kind": "rryatt_demand",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    }
+  ]
+}

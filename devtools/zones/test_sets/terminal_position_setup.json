@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "terminal_position_setup",
+  "title": "Explicit station-shuttle proximity setup, logout and exact saved point",
+  "category": "functional",
+  "roles": ["actor"],
+  "tests": [
+    {"id": "save_station_terminal_pose", "kind": "protocol_session", "options": {
+      "role": "actor", "position_terminal_only": true, "expect_family": "npe_space_station"
+    }}
+  ]
+}

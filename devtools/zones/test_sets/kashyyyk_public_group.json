@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_public_group",
+  "title": "Rryatt public linked-set group affinity, matching levels and positions, continuous combat quiet and arrival protection",
+  "category": "regression",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_and_identity_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "public_group_component_contracts",
+      "kind": "native_gate",
+      "options": {
+        "gate": "public_group"
+      }
+    },
+    {
+      "id": "public_groups_sets_1_and_2",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 0,
+        "mode": "affinity"
+      }
+    },
+    {
+      "id": "public_groups_sets_3_and_4",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 1,
+        "mode": "affinity"
+      }
+    },
+    {
+      "id": "public_groups_sets_5_and_6",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 2,
+        "mode": "affinity"
+      }
+    },
+    {
+      "id": "public_combat_windows",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 0,
+        "mode": "combat"
+      }
+    }
+  ]
+}

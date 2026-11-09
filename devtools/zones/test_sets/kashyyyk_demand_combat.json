@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_demand_combat",
+  "title": "Rryatt cross-world combat quiet, renewed attack, arrival protection and group cancellation",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "native_guards",
+      "kind": "native_gate",
+      "options": {
+        "gate": "public_group"
+      }
+    },
+    {
+      "id": "positive_world_combat_windows",
+      "kind": "rryatt_demand_combat",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    }
+  ]
+}

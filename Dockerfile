@@ -3,6 +3,7 @@ WORKDIR /studio
 COPY README.md pyproject.toml swg-tests.py swg-tests.ps1 build_release.py Dockerfile .dockerignore ./
 COPY swg_test_studio/ swg_test_studio/
 COPY tests/ tests/
+COPY devtools/ devtools/
 RUN python -B build_release.py --output /build/swg-test-studio.zip
 USER 65534:65534
 CMD ["python", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"]

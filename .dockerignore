@@ -10,5 +10,9 @@
 !swg_test_studio/*.py
 !swg_test_studio/examples/
 !swg_test_studio/examples/*.json
+!swg_test_studio/collections/
+!swg_test_studio/collections/*.json
+!devtools/
+!devtools/**
 !tests/
 !tests/*.py

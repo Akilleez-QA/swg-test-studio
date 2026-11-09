@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "stage7_coordinator_fencing",
+  "title": "Coordinator process loss during retirement fencing across reviewed families",
+  "category": "system",
+  "roles": ["leader", "member"],
+  "tests": [
+    {"id": "driver_guards", "kind": "driver_unit", "options": {}},
+    {"id": "service_signal_guards", "kind": "native_gate", "options": {"gate": "retirement_fault_services"}},
+    {"id": "rryatt_coordinator_loss", "kind": "retirement_coordinator_fencing",
+     "options": {"leader": "leader", "member": "member", "family": "rryatt"}},
+    {"id": "falcon_coordinator_loss", "kind": "retirement_coordinator_fencing",
+     "options": {"leader": "leader", "member": "member", "family": "falcon"}},
+    {"id": "ord_coordinator_loss", "kind": "retirement_coordinator_fencing",
+     "options": {"leader": "leader", "member": "member", "family": "ord"}}
+  ]
+}

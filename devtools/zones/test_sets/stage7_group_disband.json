@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "stage7_group_disband",
+  "title": "Leader disband clears obsolete affinity; solo entry and replacement groups preserve own placement",
+  "category": "regression",
+  "roles": [
+    "leader",
+    "member",
+    "newleader"
+  ],
+  "tests": [
+    {
+      "id": "rryatt_disband_solo_and_replacement_group",
+      "kind": "group_affinity_rryatt",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "newleader"
+      }
+    },
+    {
+      "id": "ord_disband_solo_and_replacement_group",
+      "kind": "group_affinity_ord",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "newleader"
+      }
+    }
+  ]
+}

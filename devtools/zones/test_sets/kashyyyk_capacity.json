@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_capacity",
+  "title": "Rryatt whole-set capacity, competing reservations, reconnect evidence and independent group levels",
+  "category": "regression",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "linked_capacity_reservation_leases",
+      "kind": "native_gate",
+      "options": {
+        "gate": "rryatt_capacity"
+      }
+    },
+    {
+      "id": "independent_levels_reconnect_pair_0",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 0,
+        "mode": "leases"
+      }
+    },
+    {
+      "id": "independent_levels_reconnect_pair_1",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 1,
+        "mode": "leases"
+      }
+    },
+    {
+      "id": "independent_levels_reconnect_pair_2",
+      "kind": "rryatt_group",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 2,
+        "mode": "leases"
+      }
+    }
+  ]
+}

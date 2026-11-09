@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "station_shuttle",
+  "title": "Station login, radial/SUI travel to Gamma and back, logout and exact save",
+  "category": "regression",
+  "roles": ["actor"],
+  "tests": [
+    {"id": "login_logout_save", "kind": "protocol_session", "options": {"role": "actor"}},
+    {"id": "gamma_radial_transition", "kind": "protocol_session", "options": {"role": "actor", "prepare_terminal": true, "expect_family": "npe_space_dungeon"}},
+    {"id": "station_radial_return", "kind": "protocol_session", "options": {"role": "actor", "prepare_terminal": true, "expect_family": "npe_space_station"}},
+    {"id": "repeat_login_logout_save", "kind": "protocol_session", "options": {"role": "actor"}}
+  ]
+}

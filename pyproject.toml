@@ -13,7 +13,7 @@ dependencies = []
 swg-tests = "swg_test_studio.cli:main"
 
 [tool.setuptools.package-data]
-swg_test_studio = ["examples/*.json"]
+"*" = ["*.json", "*.cpp", "*.h", "*.java"]
 
 [tool.setuptools.packages.find]
-include = ["swg_test_studio*"]
+include = ["swg_test_studio*", "devtools", "devtools.*"]

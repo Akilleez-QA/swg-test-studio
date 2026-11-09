@@ -1,0 +1,6106 @@
+{
+  "format": "swg-test-studio-collection",
+  "schema_version": 1,
+  "title": "SWG regression collection",
+  "suites": [
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "create_character",
+      "title": "Explicit dedicated character creation and first login",
+      "category": "functional",
+      "roles": [
+        "actor"
+      ],
+      "steps": [
+        {
+          "id": "create_login",
+          "action": "session",
+          "options": {
+            "role": "actor",
+            "create": true
+          }
+        },
+        {
+          "id": "repeat_login",
+          "action": "session",
+          "options": {
+            "role": "actor"
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "driver_guards",
+      "title": "Existing driver isolation and lifecycle unit regressions",
+      "category": "unit",
+      "roles": [],
+      "steps": [
+        {
+          "id": "guards",
+          "action": "saved_suite",
+          "options": {
+            "suite": "driver_unit",
+            "bindings": {}
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "gamma_shuttle",
+      "title": "Tansaari–Gamma shuttle round trip and exact saved hangar",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "steps": [
+        {
+          "id": "gamma_entry",
+          "action": "session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_dungeon"
+          }
+        },
+        {
+          "id": "station_return",
+          "action": "session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "group_disband",
+      "title": "Disband, solo independence and replacement-group affinity",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member",
+        "newleader"
+      ],
+      "steps": [
+        {
+          "id": "groups",
+          "action": "saved_suite",
+          "options": {
+            "suite": "stage7_group_disband",
+            "bindings": {
+              "leader": "leader",
+              "member": "member",
+              "newleader": "newleader"
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "login_relogin",
+      "title": "Login, full logout/save, then login again",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "steps": [
+        {
+          "id": "first_login",
+          "action": "session",
+          "options": {
+            "role": "actor"
+          }
+        },
+        {
+          "id": "repeat_login",
+          "action": "session",
+          "options": {
+            "role": "actor"
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "ord_group_sequence",
+      "title": "Ord launch, landing and group leadership",
+      "category": "regression",
+      "roles": [
+        "pilot",
+        "member"
+      ],
+      "steps": [
+        {
+          "id": "ord_round_trip",
+          "action": "action_sequence",
+          "options": {
+            "roles": [
+              "pilot",
+              "member"
+            ],
+            "actions": [
+              {
+                "kind": "form_group",
+                "actor": "pilot",
+                "peer": "member"
+              },
+              {
+                "kind": "promote",
+                "actor": "pilot",
+                "peer": "member"
+              },
+              {
+                "kind": "launch",
+                "actor": "member"
+              },
+              {
+                "kind": "launch",
+                "actor": "pilot"
+              },
+              {
+                "kind": "land",
+                "actor": "pilot"
+              },
+              {
+                "kind": "land",
+                "actor": "member"
+              },
+              {
+                "kind": "disband",
+                "actor": "member"
+              }
+            ]
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "ord_round_trip",
+      "title": "Recorded Ord launch and landing",
+      "category": "regression",
+      "roles": [
+        "pilot"
+      ],
+      "steps": [
+        {
+          "id": "recorded_journey",
+          "action": "action_sequence",
+          "options": {
+            "roles": [
+              "pilot"
+            ],
+            "actions": [
+              {
+                "kind": "launch",
+                "actor": "pilot"
+              },
+              {
+                "kind": "land",
+                "actor": "pilot"
+              }
+            ]
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "ship_and_group",
+      "title": "Original ships, group affinity, launch and landing",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "steps": [
+        {
+          "id": "ships",
+          "action": "saved_suite",
+          "options": {
+            "suite": "ship_group",
+            "bindings": {
+              "leader": "leader",
+              "member": "member"
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "shuttle_recorded_cases",
+      "title": "Recorded shuttle cancel, Gamma travel and station return",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "steps": [
+        {
+          "id": "recorded_journey_1",
+          "action": "journey",
+          "options": {
+            "role": "actor",
+            "prepare_start": true,
+            "actions": [
+              {
+                "kind": "radial_dialog",
+                "selector": "gamma_shuttle",
+                "menu_type": 21,
+                "prompt": "@npe:gamma_shuttle_prompt",
+                "answer": "cancel",
+                "source": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                },
+                "expected": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                },
+                "timeout_seconds": 120
+              }
+            ]
+          }
+        },
+        {
+          "id": "recorded_journey_2",
+          "action": "journey",
+          "options": {
+            "role": "actor",
+            "prepare_start": true,
+            "actions": [
+              {
+                "kind": "radial_dialog",
+                "selector": "gamma_shuttle",
+                "menu_type": 21,
+                "prompt": "@npe:gamma_shuttle_prompt",
+                "answer": "ok",
+                "source": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                },
+                "expected": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_dungeon",
+                  "room": "cave_entrance"
+                },
+                "timeout_seconds": 120
+              }
+            ]
+          }
+        },
+        {
+          "id": "recorded_journey_3",
+          "action": "journey",
+          "options": {
+            "role": "actor",
+            "prepare_start": true,
+            "actions": [
+              {
+                "kind": "radial_dialog",
+                "selector": "gamma_shuttle",
+                "menu_type": 21,
+                "prompt": "@npe:gamma_shuttle_prompt",
+                "answer": "ok",
+                "source": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_dungeon",
+                  "room": "cave_entrance"
+                },
+                "expected": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                },
+                "timeout_seconds": 120
+              }
+            ]
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "format": "swg-test-studio",
+      "schema_version": 1,
+      "id": "terminal_journey",
+      "title": "Connected shuttle confirmations, authored arrivals and full save",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "steps": [
+        {
+          "id": "round_trip",
+          "action": "journey",
+          "options": {
+            "role": "actor",
+            "prepare_start": true,
+            "actions": [
+              {
+                "kind": "radial_dialog",
+                "selector": "gamma_shuttle",
+                "menu_type": 21,
+                "prompt": "@npe:gamma_shuttle_prompt",
+                "answer": "ok",
+                "timeout_seconds": 120,
+                "source": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                },
+                "expected": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_dungeon",
+                  "room": "cave_entrance"
+                }
+              },
+              {
+                "kind": "radial_dialog",
+                "selector": "gamma_shuttle",
+                "menu_type": 21,
+                "prompt": "@npe:gamma_shuttle_prompt",
+                "answer": "ok",
+                "timeout_seconds": 120,
+                "source": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_dungeon",
+                  "room": "cave_entrance"
+                },
+                "expected": {
+                  "scene": "dungeon1",
+                  "family": "npe_space_station",
+                  "room": "hangarbay1"
+                }
+              }
+            ],
+            "prepare_between_actions": true
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "recording": null,
+        "unsupported": []
+      }
+    },
+    {
+      "schema_version": 1,
+      "id": "admission_collection_components",
+      "title": "Complete admission collection, serialized current registry, paired reservations and shared retirement authority",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "collection_and_routing_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "admission_collection"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "admission_pressure",
+      "title": "Complete admission scopes, bounded history, source ownership and original preparation windows",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "bounded_admission_pressure",
+          "kind": "native_gate",
+          "options": {
+            "gate": "admission_pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "authored_family_contracts",
+      "title": "All 46 authored scenes: explicit aliases, hosted ownership/capacities and exact entry/exit contracts",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "all_authored_families",
+          "kind": "native_gate",
+          "options": {
+            "gate": "authored_families"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "capacity_race",
+      "title": "Five concurrent ship launches compete for four seats across two Ord worlds",
+      "category": "system",
+      "roles": [
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "fifth"
+      ],
+      "tests": [
+        {
+          "id": "growth_exhaustion_and_retry",
+          "kind": "capacity_race",
+          "options": {
+            "actors": [
+              "first",
+              "second",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "character_clone_recovery",
+      "title": "Original public Kashyyyk clone menu, living Kachirho arrival, logout and save",
+      "category": "system",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "original_clone_to_single_kachirho",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "clone_scene": "kashyyyk_main",
+            "expect_scene": "terrain/kashyyyk_main.trn"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "character_lifecycle",
+      "title": "Dedicated character creation or retained selection, login, logout and saved relogin",
+      "category": "functional",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "create_or_select_and_save",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "create": true
+          }
+        },
+        {
+          "id": "retained_character_relogin",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "character_restore_station",
+      "title": "Explicit living test-actor setup from original Kachirho/tutorial to the retained Tansaari entrance",
+      "category": "system",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "recorded_station_fixture_restore",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "stage_station": true,
+            "expect_family": "npe_space_station",
+            "expect_scene": "terrain/dungeon1.trn"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "character_state_diagnostic",
+      "title": "Saved character login, authoritative state inspection, client disconnect and save",
+      "category": "system",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "saved_character_observation",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "disconnect": true
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "combat_windows",
+      "title": "Ship fire resets quiet time, arrival protection expires, group departure cancels queued landing",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "quiet_reset_protection_and_cancel",
+          "kind": "combat_windows",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "console_frames",
+      "title": "Actual ELF64 console framing: native keepalives, partial reads and bounded refusals",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "native_console_frames",
+          "kind": "native_gate",
+          "options": {
+            "gate": "console_frames"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "console_worker_routing",
+      "title": "ELF64 numeric console routing: guarded PID storage, exact worker and response, malformed and overflowing identifiers",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "console_worker_routing",
+          "kind": "native_gate",
+          "options": {
+            "gate": "console_worker_routing"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "driver_unit",
+      "title": "Driver identity, authentication mode, SUI selection and manifest guards",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "protocol_guards",
+          "kind": "driver_unit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "dungeon_choice_retry",
+      "title": "Original dungeon discovery: bounded locator retries, fixed expiry, stale-session recovery and once-only native CWD replies",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "bounded_original_discovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "dungeon_choice_retry"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "dungeon_choice_routes",
+      "title": "Original ticketed dungeon discovery and callbacks: selection before registry locks, chosen room and unchanged active owner/session",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "dungeon_choice_route_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "dungeon_choice_routes"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "dungeon_group_choices",
+      "title": "Ticketed dungeon member consent and original queued access: individual choices, disband/new group, source state and grouped passengers",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "dungeon_group_choice_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "dungeon_group_choices"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "encounter_automatic_components",
+      "title": "Automatic encounter startup, original journal binding and login admission",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "automatic_startup_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_automatic"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "fixture_script_components",
+      "title": "Complete driver helper compilation and JVM verification against the staged server API",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "fixture_scripts_compile_verify",
+          "kind": "native_gate",
+          "options": {
+            "gate": "fixture_scripts"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_group_components",
+      "title": "Public ground cell group placement, recovery and retirement components",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "ground_group_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "ground_group"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_group_kashyyyk_dead_forest",
+      "title": "Dead Forest public cell: disband, new group and whole-group occupied retirement",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline",
+        "filler"
+      ],
+      "tests": [
+        {
+          "id": "forest_group_cell",
+          "kind": "ground_cell_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "filler": "filler",
+            "definition": "kashyyyk_dead_forest"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_group_kashyyyk_hunting",
+      "title": "Hunting Grounds public cell: disband, new group and whole-group occupied retirement",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline",
+        "filler"
+      ],
+      "tests": [
+        {
+          "id": "hunting_group_cell",
+          "kind": "ground_cell_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "filler": "filler",
+            "definition": "kashyyyk_hunting"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_group_kashyyyk_main",
+      "title": "Kachirho remains one authoritative world; parallel-copy policy and travel refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "kachirho_single_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "single_world"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_live_kashyyyk_dead_forest",
+      "title": "Dead forest public cell: full saves, normal grown-copy retirement, recovery and replacement relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline"
+      ],
+      "tests": [
+        {
+          "id": "dead_forest_cell",
+          "kind": "ground_cell_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "definition": "kashyyyk_dead_forest"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_live_kashyyyk_hunting",
+      "title": "Hunting grounds public cell: full saves, normal grown-copy retirement, recovery and replacement relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline"
+      ],
+      "tests": [
+        {
+          "id": "hunting_cell",
+          "kind": "ground_cell_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "definition": "kashyyyk_hunting"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_live_kashyyyk_main",
+      "title": "Kachirho remains one authoritative world; parallel-copy policy and travel refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "kachirho_single_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "single_world"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ground_cell_recovery_components",
+      "title": "Public ground cells: authored source and portal proof, exact saved placement, entrance fallback and native dismount ordering",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "ground_recovery_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "ground_recovery"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "heroic_group_ownership",
+      "title": "Heroic owning group: durable session party, current membership, original exit, disband/replacement groups and retained-login refusal across seven entrances",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "native_and_original_script_membership",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_group_ownership"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "heroic_live_fixture",
+      "title": "Heroic live fixture: fixed console scope, actual server API compilation, saved roles and exact exit/position assertions",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "guarded_live_fixture",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_live_fixture"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_complete_contracts",
+      "title": "Complete static, snapshot and public host contracts and publisher lifecycle",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "mixed_host_and_publisher_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_complete"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_content_layout",
+      "title": "All authored types: exact native root footprints, publisher proof and persistent-world refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "authored_layout_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_layout"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_content_layout_live",
+      "title": "Authored layout and publisher proof on native objects with typed demand and original-ship group regression",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "authored_layout_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_layout"
+          }
+        },
+        {
+          "id": "private_roots_and_solo_lifecycle",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "typed_hosted_family_selection",
+          "kind": "hosted_capacity",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "original_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_content_readiness",
+      "title": "Complete static-host budgets and original return-world readiness",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "complete_host_and_original_returns",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_readiness"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_content_readiness_live",
+      "title": "Complete host budgets, original exits and automatic family prewarm with live legacy regressions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "complete_host_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_readiness"
+          }
+        },
+        {
+          "id": "private_roots_and_solo_lifecycle",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "typed_hosted_family_selection",
+          "kind": "hosted_capacity",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "original_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_automatic_live",
+      "title": "Automatic startup binding followed by original owned room entry and exit",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "automatic_native_room_start",
+          "kind": "encounter_automatic",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_bootstrap_live",
+      "title": "Committed ownership bootstrap with all current native writers sealed",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "writer_journal_bootstrap",
+          "kind": "encounter_bootstrap",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_census_database",
+      "title": "Read-only saved encounter ownership census and epoch floor",
+      "category": "system",
+      "roles": [],
+      "tests": [
+        {
+          "id": "saved_ownership_census",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_census_database"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_census_live",
+      "title": "Asynchronous saved ownership census with retained online driver actors",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "saved_census_delivery",
+          "kind": "encounter_census",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_components",
+      "title": "Encounter identity, three-prefix cleanup, committed releases and native wire; no room lifecycle acceptance",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "encounter_component_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_cleanup"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_enrollment_components",
+      "title": "Worker growth: atomic committed grant imports, original writer preservation and deferred native requests",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "enrollment_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_enrollment"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_enrollment_live",
+      "title": "Normal ship entry grows capacity while preserving an active room grant and all-worker committed cleanup",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "growth_under_active_room_lease",
+          "kind": "encounter_enrollment",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_exact_load_live",
+      "title": "Saved owned object unload, exact native reconstruction and committed original room cleanup",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "missing_saved_spawn_reconstruction",
+          "kind": "encounter_load",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_inventory_database",
+      "title": "Committed room inventory, unloaded possessions and deletion phases",
+      "category": "system",
+      "roles": [],
+      "tests": [
+        {
+          "id": "committed_inventory",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_inventory_database"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_load_components",
+      "title": "Exact saved-object load protocol, persistence, native reconstruction, fixture and refusal regressions",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "exact_native_load_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_exact_load"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_offline_components",
+      "title": "Offline released possessions: current player ancestry, separate manifests and three committed prefixes",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "offline_disposition_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_offline"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_offline_live",
+      "title": "Original released possession survives fully offline holder, room cleanup and normal inventory relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "offline_released_possession",
+          "kind": "encounter_offline",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_origins",
+      "title": "Real native encounter creation and destruction hooks in the copied fixture",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "native_origin_callbacks",
+          "kind": "encounter_origins",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_recovery_live",
+      "title": "Normally restarted encounter retains identity through committed cleanup",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "retained_encounter_reconciliation",
+          "kind": "encounter_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_release_database",
+      "title": "Read-only retained SWG Oracle containment and native player-release proof",
+      "category": "system",
+      "roles": [],
+      "tests": [
+        {
+          "id": "committed_ownership_query",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_release_database"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_reuse_live",
+      "title": "Recovered private room completes two ordinary sessions with different owners",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "ordinary_same_room_reuse",
+          "kind": "encounter_reuse",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_root_claim_live",
+      "title": "Original private entry after durable all-worker root grant",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "native_root_claim_start",
+          "kind": "encounter_root_claim",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_withdrawal_components",
+      "title": "Planned worker withdrawal: exact native emptiness, freeze/save/reap and surviving writer grants",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "withdrawal_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "encounter_withdrawal"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_encounter_withdrawal_live",
+      "title": "Normal capacity growth and empty-worker retirement retain an active private room and committed cleanup",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "retire_grown_worker_under_active_room_lease",
+          "kind": "encounter_withdrawal",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_family_capacity",
+      "title": "Mixed hosted families: separate demand, offline reservations and complete-host readiness",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "hosted_family_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_capacity"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_family_capacity_live",
+      "title": "Hosted-family production wire/JNI selection and original-ship/group regression",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "hosted_family_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_capacity"
+          }
+        },
+        {
+          "id": "hosted_family_selection_live",
+          "kind": "hosted_capacity",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "legacy_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_hint_expiry",
+      "title": "Bounded native hint reuse across canonical and hosted targets with stale-reply fences",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "native_selection_and_family_lifecycle",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_capacity"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_hint_expiry_live",
+      "title": "Expired native hints, complete host readiness and live ordinary character regressions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "native_hint_expiry_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_capacity"
+          }
+        },
+        {
+          "id": "complete_host_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_readiness"
+          }
+        },
+        {
+          "id": "private_roots_and_solo_lifecycle",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "typed_hosted_family_selection",
+          "kind": "hosted_capacity",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "original_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_login_recovery_components",
+      "title": "Hosted login recovery: exact private exits, charged public rooms, immutable source/placement, original cleanup and committed save barriers",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "hosted_exit_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_login"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_managed_returns",
+      "title": "Authored hosted exits into exact ready managed ground worlds",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "managed_returns_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_readiness"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_private_mtp",
+      "title": "Positive private MTP: original entry, full-unload same-session login, room reuse, Corellia exit and unchanged witness",
+      "category": "system",
+      "roles": [
+        "actor",
+        "witness"
+      ],
+      "tests": [
+        {
+          "id": "private_fixture_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_private_fixture"
+          }
+        },
+        {
+          "id": "positive_private_entry_resume_and_close",
+          "kind": "hosted_private_mtp",
+          "options": {
+            "leader": "actor",
+            "member": "witness"
+          }
+        },
+        {
+          "id": "restored_public_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_private_mtp_join",
+      "title": "Positive private MTP: retained login, active remote join without restart, reuse and original exits",
+      "category": "system",
+      "roles": [
+        "actor",
+        "witness"
+      ],
+      "tests": [
+        {
+          "id": "private_fixture_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_private_fixture"
+          }
+        },
+        {
+          "id": "positive_private_active_join_and_lifecycle",
+          "kind": "hosted_private_mtp_join",
+          "options": {
+            "leader": "actor",
+            "member": "witness"
+          }
+        },
+        {
+          "id": "restored_public_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_gamma_recovery",
+      "title": "Saved positive Gamma login, authored shuttle return and retained station relogin",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "saved_gamma_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "expect_family": "npe_space_dungeon",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "authored_station_return",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "repeat_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_actor_login",
+      "title": "Retained actor: charged positive Tansaari login, authoritative placement, full logout and exact saved point",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "positive_station_login_save",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_login",
+      "title": "Positive public-host login recovery, committed save and repeat ordinary login",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "leader_saved_host_recovery",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "leader_positive_host_relogin",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "member_saved_host_recovery",
+          "kind": "protocol_session",
+          "options": {
+            "role": "member",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "member_positive_host_relogin",
+          "kind": "protocol_session",
+          "options": {
+            "role": "member",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_myyydril",
+      "title": "Positive Myyydril host: authored entry, group affinity, full relogin, pending reconnect and exit",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "positive_public_portal_round_trip",
+          "kind": "hosted_public_instance_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "myyydril_caverns"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_nova",
+      "title": "Positive Nova host: original ship launch, authored entry, group affinity, relogin, reconnect and exit",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "positive_public_portal_round_trip",
+          "kind": "hosted_public_instance_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "nova_orion_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_release",
+      "title": "Positive public hosts: Myyydril and Nova group/reconnect lifecycles, both actors' Gamma shuttle round trips and saved logins",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "myyydril_group_reconnect",
+          "kind": "hosted_public_instance_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "myyydril_caverns"
+          }
+        },
+        {
+          "id": "nova_group_reconnect",
+          "kind": "hosted_public_instance_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "nova_orion_station"
+          }
+        },
+        {
+          "id": "leader_gamma_shuttle",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_dungeon",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "leader_station_shuttle",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "member_gamma_shuttle",
+          "kind": "protocol_session",
+          "options": {
+            "role": "member",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_dungeon",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "member_station_shuttle",
+          "kind": "protocol_session",
+          "options": {
+            "role": "member",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "leader_repeat_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "member_repeat_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "member",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_instance_shuttle",
+      "title": "Positive public host login, authored Gamma shuttle round trip, logout and repeat save",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "positive_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "gamma_radial_transition",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_dungeon",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "station_radial_return",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        },
+        {
+          "id": "repeat_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "expect_family": "npe_space_station",
+            "require_hosted_public_instance": true
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_myyydril",
+      "title": "Myyydril original public entry, group affinity, full relogin and exit",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "original_public_portal_round_trip",
+          "kind": "hosted_public_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "myyydril_caverns"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "hosted_public_nova",
+      "title": "Nova original public entry, group affinity, relogin and owned-ship return",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "original_public_portal_round_trip",
+          "kind": "hosted_public_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "nova_orion_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kachirho_single_world",
+      "title": "Kachirho remains one authoritative world; parallel-copy policy and travel refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "kachirho_single_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "single_world"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kachirho_single_world_live",
+      "title": "Single Kachirho world, independent grouped Rryatt entry and authored world-zero returns",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "kachirho_zero_group_round_trip",
+          "kind": "kachirho_single",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_capacity",
+      "title": "Rryatt whole-set capacity, competing reservations, reconnect evidence and independent group levels",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "linked_capacity_reservation_leases",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_capacity"
+          }
+        },
+        {
+          "id": "independent_levels_reconnect_pair_0",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0,
+            "mode": "leases"
+          }
+        },
+        {
+          "id": "independent_levels_reconnect_pair_1",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 1,
+            "mode": "leases"
+          }
+        },
+        {
+          "id": "independent_levels_reconnect_pair_2",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 2,
+            "mode": "leases"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_clone",
+      "title": "Focused Rryatt death setup and normal clone menu/respawn from existing independent saved trail placements",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_linked_assertion_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_request_and_controller_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "existing_trail_clone_and_saved_logout",
+          "kind": "rryatt_clone",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_demand",
+      "title": "Complete Rryatt demand worlds, linked guides, group affinity and saved login",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "demand_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_demand"
+          }
+        },
+        {
+          "id": "complete_set_growth_group_and_reconnect",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_demand_capacity",
+      "title": "Rryatt two-world four-seat exhaustion, request expiry and fresh retry",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "third",
+        "fourth",
+        "fifth"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "native_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_capacity"
+          }
+        },
+        {
+          "id": "five_real_requests_and_expiry",
+          "kind": "rryatt_demand_capacity",
+          "options": {
+            "actors": [
+              "leader",
+              "member",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_demand_combat",
+      "title": "Rryatt cross-world combat quiet, renewed attack, arrival protection and group cancellation",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "native_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "public_group"
+          }
+        },
+        {
+          "id": "positive_world_combat_windows",
+          "kind": "rryatt_demand_combat",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_demand_content",
+      "title": "Demand-world mastery shortcuts, own-root cloning and ordinary unstuck",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "native_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "live_mastery_clone_unstuck",
+          "kind": "rryatt_demand_content",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_demand_faults",
+      "title": "Rryatt pending-arrival worker loss, empty controller loss, saved-copy recovery and maintenance restart",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "fault_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_demand_fault"
+          }
+        },
+        {
+          "id": "live_linked_worker_and_controller_recovery",
+          "kind": "rryatt_demand_faults",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "coordinated_empty_controller_recovery",
+          "kind": "rryatt_fixture_restart",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_entry",
+      "title": "Rryatt entry foundation: all six linked sets, concurrent gates, full saved logins and exact controllers",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_suite_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_request_and_world_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "concurrent_rryatt_gate_save_relogin_exit",
+          "kind": "rryatt_entry",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_linked",
+      "title": "All six Rryatt sets: original guide conversations, bidirectional links, eight entrance returns and deepest-level saved login",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_linked_assertion_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_request_and_controller_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "linked_sets_1_and_2",
+          "kind": "rryatt_linked",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0
+          }
+        },
+        {
+          "id": "linked_sets_3_and_4",
+          "kind": "rryatt_linked",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 1
+          }
+        },
+        {
+          "id": "linked_sets_5_and_6",
+          "kind": "rryatt_linked",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 2
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_live_capacity",
+      "title": "Live Rryatt final-seat contention, linked-level accounting, queued release and bounded exhaustion",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "filler"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "linked_capacity_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_capacity"
+          }
+        },
+        {
+          "id": "live_two_seat_common_set_exhaustion",
+          "kind": "rryatt_live_capacity",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "filler"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_live_faults",
+      "title": "Rryatt owner partition, pending arrival worker crash and deep-level reconnect",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "fault_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_fault"
+          }
+        },
+        {
+          "id": "live_rryatt_pending_arrival_faults",
+          "kind": "rryatt_live_faults",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_public_combat",
+      "title": "Rryatt public consolidation quiet, arrival protection and group departure",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_identity_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "public_group_component_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "public_group"
+          }
+        },
+        {
+          "id": "public_combat_windows",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0,
+            "mode": "combat"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_public_group",
+      "title": "Rryatt public linked-set group affinity, matching levels and positions, continuous combat quiet and arrival protection",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_identity_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "public_group_component_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "public_group"
+          }
+        },
+        {
+          "id": "public_groups_sets_1_and_2",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0,
+            "mode": "affinity"
+          }
+        },
+        {
+          "id": "public_groups_sets_3_and_4",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 1,
+            "mode": "affinity"
+          }
+        },
+        {
+          "id": "public_groups_sets_5_and_6",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 2,
+            "mode": "affinity"
+          }
+        },
+        {
+          "id": "public_combat_windows",
+          "kind": "rryatt_group",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0,
+            "mode": "combat"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "kashyyyk_recovery",
+      "title": "Rryatt mastery unlocks and shortcuts, cloning, normal unstuck and stale-controller saved login across six linked sets",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_and_linked_assertion_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_request_and_controller_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "recovery_sets_1_and_2",
+          "kind": "rryatt_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 0
+          }
+        },
+        {
+          "id": "recovery_sets_3_and_4",
+          "kind": "rryatt_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 1
+          }
+        },
+        {
+          "id": "recovery_sets_5_and_6",
+          "kind": "rryatt_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "pair": 2
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_heroic_axkva_min_ejection",
+      "title": "heroic_axkva_min: original entry, member removal, disband and replacement-group refusal with exact remaining positions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_and_suite_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_live_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_authored_exits",
+          "kind": "heroic_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "outsider": "outsider",
+            "family": "heroic_axkva_min"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_heroic_exar_kun_ejection",
+      "title": "heroic_exar_kun: original entry, member removal, disband and replacement-group refusal with exact remaining positions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_and_suite_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_live_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_authored_exits",
+          "kind": "heroic_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "outsider": "outsider",
+            "family": "heroic_exar_kun"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_heroic_ig88_ejection",
+      "title": "heroic_ig88: original entry, member removal, disband and replacement-group refusal with exact remaining positions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_and_suite_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_live_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_authored_exits",
+          "kind": "heroic_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "outsider": "outsider",
+            "family": "heroic_ig88"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_heroic_star_destroyer_ejection",
+      "title": "heroic_star_destroyer: original entry, member removal, disband and replacement-group refusal with exact remaining positions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_and_suite_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "heroic_live_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_authored_exits",
+          "kind": "heroic_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "outsider": "outsider",
+            "family": "heroic_star_destroyer"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_hoth_team1_ejection",
+      "title": "Echo Base team 1: owning-group removal, disband and qualifying replacement-group refusal; exact remaining points",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "reserve",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hoth_heroic_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_original_exit",
+          "kind": "hoth_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "remaining_two": "reserve",
+            "outsider": "outsider",
+            "team": 1
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "live_hoth_team2_ejection",
+      "title": "Echo Base team 2: owning-group removal, disband and qualifying replacement-group refusal; exact remaining points",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "remaining",
+        "reserve",
+        "outsider"
+      ],
+      "tests": [
+        {
+          "id": "fixture_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hoth_heroic_fixture"
+          }
+        },
+        {
+          "id": "live_membership_and_original_exit",
+          "kind": "hoth_group_ejection",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "remaining": "remaining",
+            "remaining_two": "reserve",
+            "outsider": "outsider",
+            "team": 2
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "pending_faults",
+      "title": "Pending arrival retains its durable seat through a worker pause and recovers after a worker crash",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "partition_crash_and_login_recovery",
+          "kind": "pending_faults",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "pilot_presence",
+      "title": "Actual fighter and POB pilot presence, occupancy, quiet window, movable arrival and ten-second combat protection",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "actual_pilot_world_and_protection",
+          "kind": "native_gate",
+          "options": {
+            "gate": "pilot_presence"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_active_join",
+      "title": "Original scripted private joins retain source eligibility and current controller identity",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "original_active_join_authority",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_active_join"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_arrival_components",
+      "title": "Original private arrival: exact session and occupancy, committed receipt prefix, control/visibility publication and stale-authority refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_arrival_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_arrival"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_caller_startup",
+      "title": "Private entry caller identity from every catalog source scene",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_source_caller_startup",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_caller_startup"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_choice_metadata",
+      "title": "Selected native room session: actual JNI dictionary, original integer bounds and compatible script declarations",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "native_selected_session",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_choice_metadata"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_choice_preparation",
+      "title": "Private choice callbacks: native claims, original controller correlation, group invalidation and admission handoff",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_choice_preparation_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_choice_preparation"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_choice_pressure",
+      "title": "Private source request and coordinator pressure: exact terminal collection, cancellation drainage and uncertain native lease retention",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "bounded_private_request_and_claim_records",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_choice_pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_cleanup_callbacks",
+      "title": "Uplink and shared sequencer cleanup callback session fences with private admission",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "cleanup_session_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_cleanup_callbacks_live",
+      "title": "Private cleanup callback fences with ordinary private/solo/group and original ship regression",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "cleanup_session_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        },
+        {
+          "id": "private_roots_solo_group_lifecycle",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "original_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_client_lifecycle",
+      "title": "Private arrival departure and GameServer-owned client cleanup",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_client_owner_lifecycle",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_client_lifecycle"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_close_correlation",
+      "title": "Owner-close family/query intent and private lease callback regression",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "owner_close_response_and_private_lifecycle_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_close_lifecycle",
+      "title": "Exact private timer/owner close identity across all fifteen original session types",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_close_and_cleanup_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_consolidation",
+      "title": "Private same-family consolidation: each member's level and point, current resident access, disband/new group, original lockout deadline and crew combat boundary",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_consolidation_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_consolidation"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_consolidation_transaction",
+      "title": "Private consolidation transaction: read-only source dispatch, confirmed destination, protected receipts and bounded asynchronous failure retry",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "deferred_destination_transaction",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_consolidation_transaction"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_crew_admission",
+      "title": "Private crew component contracts: actual solo identities, original selected journey, independent choices, heroic group exclusivity and group revocation",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_crew_admission_boundaries",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_crew"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_departure_recovery",
+      "title": "Durable private source recovery: pre-save registration, destination commit, original source disposal, offline retries and public-exit settlement",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "durable_original_source_settlement",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_departure_recovery"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_departure_transaction",
+      "title": "Private source accounting: exact committed destination, original participant removal and committed source save before receipt settlement",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "committed_original_source_accounting",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_departure_transaction"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_group_access",
+      "title": "Private current-group ownership, disband/replacement groups and original lockout refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "current_group_and_lockout_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_admission"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_group_fixture",
+      "title": "Explicit private group/crew fixture, exact native pins and separately provisioned durable source settlement history",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_group_activation_and_durable_history_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_group_fixture"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_group_selection",
+      "title": "Private pre-creation choice components: original ownership, physical group affinity and solo fences",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_group_choice_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_group_selection"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_initial_recovery",
+      "title": "Interrupted private arrivals: separate login authority, immutable original charge and exact approved saved geometry",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_initial_recovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_initial_recovery"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_instance_admission",
+      "title": "Private dungeon admission: authored solo limits, delayed grouping and exact registry identities",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_admission_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_admission"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_owned_lifecycle",
+      "title": "Original solo private owner entry/close/repeat with authored Corellia exit and stationary witness",
+      "category": "system",
+      "roles": [
+        "actor",
+        "witness"
+      ],
+      "tests": [
+        {
+          "id": "private_close_component_regression",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        },
+        {
+          "id": "owned_private_room_real_actor",
+          "kind": "private_owned_lifecycle",
+          "options": {
+            "leader": "actor",
+            "member": "witness"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_passenger_fixture",
+      "title": "Uninstalled same-world passenger fixture: exact copied identities, original boarding, foreign/group refusal and original fighter restoration",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "original_passenger_setup_boundaries",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_passenger_fixture"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_placement_attachment",
+      "title": "Held private arrival schedules original interior placement before publication",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "held_private_placement",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_placement_attachment"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_resume_foundation",
+      "title": "Private retained-login foundation: distinct paired charge, original receipt, current session and original saved-participant decisions",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_resume_foundation",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_resume_foundation"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_retained_login",
+      "title": "Private retained login: original access, native absence, durable paired seats, closure exits and committed scene publication",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_retained_login",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_retained_login"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_session_leases",
+      "title": "All private dungeon leases: ownership, offline reservations and native registry/session fences",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_lease_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_leases"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_session_leases_live",
+      "title": "Private leases: native/script components, all placed dungeon1 roots and real-actor group denial lifecycle",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "private_lease_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_leases"
+          }
+        },
+        {
+          "id": "private_leases_and_solo_admission_live",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_ship_crew_fixture",
+      "title": "Temporary original POB fixture: exact actor/schema, original-ship protection, compilation and complete cleanup fences",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "temporary_pob_fixture_boundaries",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_ship_fixture"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_ship_round_trip",
+      "title": "Original POB: normal launch/landing, retained original ship and stopped point, complete temporary-object and skill cleanup",
+      "category": "system",
+      "roles": [
+        "pilot",
+        "witness"
+      ],
+      "tests": [
+        {
+          "id": "temporary_pob_fixture_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_ship_fixture"
+          }
+        },
+        {
+          "id": "create_or_reuse_dedicated_pob_actor",
+          "kind": "protocol_session",
+          "options": {
+            "role": "pilot",
+            "create": true
+          }
+        },
+        {
+          "id": "original_pob_round_trip_and_cleanup",
+          "kind": "private_ship_round_trip",
+          "options": {
+            "leader": "pilot",
+            "member": "witness"
+          }
+        },
+        {
+          "id": "restored_station_login",
+          "kind": "protocol_session",
+          "options": {
+            "role": "pilot",
+            "require_hosted_public_instance": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_solo_admission",
+      "title": "Real actor solo admission: grouped denial, disband and replacement-group membership",
+      "category": "functional",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "private_admission_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_admission"
+          }
+        },
+        {
+          "id": "private_solo_live",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_uplink_callbacks",
+      "title": "Original uplink pacing with cleanup/restart session fencing and original private admission",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "private_session_callback_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_uplink_callbacks_live",
+      "title": "Original uplink callback fencing with native private admission and ordinary actor regression",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "private_callback_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        },
+        {
+          "id": "private_roots_solo_group_lifecycle",
+          "kind": "private_solo_admission",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "original_ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_valley_cleanup",
+      "title": "Valley queued cleanup retains replacement encounter and original private-session admission",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "cleanup_session_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_working_failure",
+      "title": "Working Factory destruction and delayed owner-close regression",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "working_factory_destruction_and_failure_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "private_working_opening",
+      "title": "Working Factory delayed opening and private owner lifecycle regression",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "working_factory_lease_and_opening_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_callbacks"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "public_cell_publication",
+      "title": "Forced public-cell load places the actor before control while preserving same-root, private admission and scene-publication checks",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "actual_public_cell_order_and_original_boundaries",
+          "kind": "native_gate",
+          "options": {
+            "gate": "public_cell_publication"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "scene_publication",
+      "title": "Scene publication before character and ship observations",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "authenticated_scene_publication_and_handoff",
+          "kind": "native_gate",
+          "options": {
+            "gate": "scene_publication"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "ship_group",
+      "title": "Owned-ship launch, group placement, landing, relaunch and full saves",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "ship_group_round_trip",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "space_split",
+      "title": "Demand overflow and same-family group consolidation preserve each original ship and space point",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "filler"
+      ],
+      "tests": [
+        {
+          "id": "separate_space_copies_consolidate",
+          "kind": "space_split",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "filler"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "split_friend",
+      "title": "Separate public copies, Friend Finder and position-preserving group consolidation",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "friend_search_and_consolidation",
+          "kind": "split_friend",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage5_native",
+      "title": "Stage 5 ELF64 capacity, combat, durable recovery and routing regression gates",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "capacity_and_budget",
+          "kind": "native_gate",
+          "options": {
+            "gate": "capacity"
+          }
+        },
+        {
+          "id": "combat_and_protection",
+          "kind": "native_gate",
+          "options": {
+            "gate": "combat"
+          }
+        },
+        {
+          "id": "durable_recovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "recovery"
+          }
+        },
+        {
+          "id": "routing_and_quests",
+          "kind": "native_gate",
+          "options": {
+            "gate": "routing"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage5_release",
+      "title": "Complete Stage 5 release regression: native gates, terminals, groups, ships, combat, recovery and capacity",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member",
+        "third",
+        "fourth",
+        "fifth"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "native_capacity",
+          "kind": "native_gate",
+          "options": {
+            "gate": "capacity"
+          }
+        },
+        {
+          "id": "native_combat",
+          "kind": "native_gate",
+          "options": {
+            "gate": "combat"
+          }
+        },
+        {
+          "id": "native_recovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "recovery"
+          }
+        },
+        {
+          "id": "native_routing",
+          "kind": "native_gate",
+          "options": {
+            "gate": "routing"
+          }
+        },
+        {
+          "id": "ship_launch_group_land_relaunch",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "station_login_logout",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "gamma_entry",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_dungeon"
+          }
+        },
+        {
+          "id": "gamma_return",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "station_relogin",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "pending_arrival_partition_crash_reconnect",
+          "kind": "pending_faults",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "friend_finder_and_public_consolidation",
+          "kind": "split_friend",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "separate_space_consolidation",
+          "kind": "space_split",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "third"
+          }
+        },
+        {
+          "id": "combat_quiet_protection_and_cancellation",
+          "kind": "combat_windows",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "maintenance_restart_before_growth",
+          "kind": "fixture_restart",
+          "options": {
+            "actors": [
+              "leader",
+              "member",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        },
+        {
+          "id": "concurrent_capacity_and_expiry",
+          "kind": "capacity_race",
+          "options": {
+            "actors": [
+              "leader",
+              "member",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage6_release",
+      "title": "Stage 6 complete linked-set demand, capacity, combat, live faults and prior-family regressions",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member",
+        "third",
+        "fourth",
+        "fifth"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "native_capacity",
+          "kind": "native_gate",
+          "options": {
+            "gate": "capacity"
+          }
+        },
+        {
+          "id": "native_combat",
+          "kind": "native_gate",
+          "options": {
+            "gate": "combat"
+          }
+        },
+        {
+          "id": "native_recovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "recovery"
+          }
+        },
+        {
+          "id": "native_routing",
+          "kind": "native_gate",
+          "options": {
+            "gate": "routing"
+          }
+        },
+        {
+          "id": "native_kashyyyk",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "native_rryatt_demand",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_demand"
+          }
+        },
+        {
+          "id": "native_rryatt_demand_fault",
+          "kind": "native_gate",
+          "options": {
+            "gate": "rryatt_demand_fault"
+          }
+        },
+        {
+          "id": "maintenance_before_demand",
+          "kind": "rryatt_fixture_restart",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "growth_guides_group_levels_and_reconnect",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "mastery_clone_and_unstuck",
+          "kind": "rryatt_demand_content",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "live_capacity_exhaustion_and_expiry",
+          "kind": "rryatt_demand_capacity",
+          "options": {
+            "actors": [
+              "leader",
+              "member",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        },
+        {
+          "id": "linked_combat_windows_and_cancellation",
+          "kind": "rryatt_demand_combat",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "live_worker_controller_and_saved_copy_recovery",
+          "kind": "rryatt_demand_faults",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "maintenance_after_controller_loss",
+          "kind": "rryatt_fixture_restart",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "friend_finder_and_public_consolidation",
+          "kind": "split_friend",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "ship_launch_group_land_relaunch",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "gamma_entry",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_dungeon"
+          }
+        },
+        {
+          "id": "gamma_return",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "station_relogin",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_all_instance_native",
+      "title": "All-family shutdown, capacity, solo sessions, medical daily reset, combat, recovery, routing and content regressions",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "native_complete_hosted_contracts",
+          "kind": "native_gate",
+          "options": {
+            "gate": "hosted_complete"
+          }
+        },
+        {
+          "id": "native_whole_world_families",
+          "kind": "native_gate",
+          "options": {
+            "gate": "whole_world_families"
+          }
+        },
+        {
+          "id": "native_authored_families",
+          "kind": "native_gate",
+          "options": {
+            "gate": "authored_families"
+          }
+        },
+        {
+          "id": "native_distributed_shutdown",
+          "kind": "native_gate",
+          "options": {
+            "gate": "distributed_shutdown"
+          }
+        },
+        {
+          "id": "native_capacity",
+          "kind": "native_gate",
+          "options": {
+            "gate": "capacity"
+          }
+        },
+        {
+          "id": "native_combat",
+          "kind": "native_gate",
+          "options": {
+            "gate": "combat"
+          }
+        },
+        {
+          "id": "native_recovery",
+          "kind": "native_gate",
+          "options": {
+            "gate": "recovery"
+          }
+        },
+        {
+          "id": "native_routing",
+          "kind": "native_gate",
+          "options": {
+            "gate": "routing"
+          }
+        },
+        {
+          "id": "native_kashyyyk",
+          "kind": "native_gate",
+          "options": {
+            "gate": "kashyyyk"
+          }
+        },
+        {
+          "id": "native_private_sessions",
+          "kind": "native_gate",
+          "options": {
+            "gate": "private_sessions"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_all_instances",
+      "title": "All-scene retirement guards; live Falcon, Ord and linked Rryatt retirement/wake with ship, group and station regressions",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "distributed_shutdown_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "distributed_shutdown"
+          }
+        },
+        {
+          "id": "whole_empty_linked_world_retire_and_new_id_wake",
+          "kind": "distributed_shutdown",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "falcon_and_ord_retire_wake_and_lease_guards",
+          "kind": "reviewed_shutdown",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "linked_group_level_position_and_reconnect_regression",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "ship_group_round_trip_after_retirements",
+          "kind": "ship_group",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "gamma_entry_after_retirements",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_dungeon"
+          }
+        },
+        {
+          "id": "gamma_return_after_retirements",
+          "kind": "protocol_session",
+          "options": {
+            "role": "leader",
+            "prepare_terminal": true,
+            "expect_scene": "terrain/dungeon1.trn",
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_automatic_retirement",
+      "title": "Opt-in idle retirement of empty Ord and whole linked Rryatt worlds, with preserved warm copy and new-ID wake",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "retirement_policy_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_foundation"
+          }
+        },
+        {
+          "id": "linked_rryatt_idle_retirement",
+          "kind": "automatic_retirement_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "ord_idle_retirement",
+          "kind": "automatic_retirement_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_authorizing",
+      "title": "Central loss with DatabaseServer authorization held; all-family recovery with committed saved actors",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_committing",
+      "title": "Central loss at committing with exact worker and database holds; all-family generation recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_fault_matrix",
+      "title": "Central loss at every retirement boundary across Falcon, Ord and linked Rryatt; saved actors and exact generation recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "service_and_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_authorizing",
+          "kind": "retirement_central_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_committing",
+          "kind": "retirement_central_committing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        },
+        {
+          "id": "rryatt_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_fencing",
+      "title": "Central loss before supervisor fence receipts; global empty proof and higher-generation retirement for all eligible families",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_fencing",
+          "kind": "retirement_central_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_freezing",
+      "title": "Central loss at freezing with exact worker and database holds; all-family generation recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_freezing",
+          "kind": "retirement_central_freezing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_stopping_games",
+      "title": "Central loss at stopping_games with all supervisor fences; all-family generation recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_stopping_games",
+          "kind": "retirement_central_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_central_stopping_planet",
+      "title": "Central loss at stopping_planet with all supervisor fences; all-family generation recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_central_loss_during_stopping_planet",
+          "kind": "retirement_central_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_coordinator_fencing",
+      "title": "Coordinator process loss during retirement fencing across reviewed families",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "service_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        },
+        {
+          "id": "rryatt_coordinator_loss",
+          "kind": "retirement_coordinator_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_coordinator_loss",
+          "kind": "retirement_coordinator_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_coordinator_loss",
+          "kind": "retirement_coordinator_fencing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_database_authorizing",
+      "title": "Database process loss during retirement authorization across reviewed families",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "service_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        },
+        {
+          "id": "rryatt_database_loss",
+          "kind": "retirement_database_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_database_loss",
+          "kind": "retirement_database_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_database_loss",
+          "kind": "retirement_database_authorizing",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_distributed_shutdown",
+      "title": "Stage 7 Central distributed empty linked-world shutdown and demand wake",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "distributed_shutdown_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "distributed_shutdown"
+          }
+        },
+        {
+          "id": "whole_empty_linked_world_retire_and_new_id_wake",
+          "kind": "distributed_shutdown",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "linked_group_level_position_and_reconnect_regression",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_falcon_expired_room",
+      "title": "Production Falcon session expiry permits empty host retirement, followed by phase-2 private-room recovery and relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "falcon_expired_room_retirement_restart_and_relogin",
+          "kind": "retirement_offline_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "family": "falcon"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_game_supervisor_stop",
+      "title": "Game supervisor loss at the distributed StopGames boundary",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "service_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        },
+        {
+          "id": "rryatt_game_supervisor_loss",
+          "kind": "retirement_game_supervisor_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_game_supervisor_loss",
+          "kind": "retirement_game_supervisor_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_game_supervisor_loss",
+          "kind": "retirement_game_supervisor_stopping_games",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_group_disband",
+      "title": "Leader disband clears obsolete affinity; solo entry and replacement groups preserve own placement",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member",
+        "newleader"
+      ],
+      "tests": [
+        {
+          "id": "rryatt_disband_solo_and_replacement_group",
+          "kind": "group_affinity_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "newleader"
+          }
+        },
+        {
+          "id": "ord_disband_solo_and_replacement_group",
+          "kind": "group_affinity_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "newleader"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_live_fault_recovery",
+      "title": "Live sealed worker loss before freeze proof, durable quarantine, proven-stop restart and higher-generation retirement for every eligible family",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_sealed_loss_restart_and_reap",
+          "kind": "retirement_fault_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_sealed_loss_restart_and_reap",
+          "kind": "retirement_fault_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_sealed_loss_restart_and_reap",
+          "kind": "retirement_fault_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_occupied_combat",
+      "title": "Renewed normal combat restarts the continuous quiet period before occupied retirement evacuation",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "pressure"
+      ],
+      "tests": [
+        {
+          "id": "rryatt_renewed_combat_then_protected_retirement",
+          "kind": "retirement_occupied_combat_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        },
+        {
+          "id": "ord_renewed_combat_then_protected_retirement",
+          "kind": "retirement_occupied_combat_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_occupied_interrupted",
+      "title": "Pending occupied evacuation survives disconnect and cohort cancellation without another seat",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "pressure"
+      ],
+      "tests": [
+        {
+          "id": "rryatt_pending_evacuation_disconnect_and_relogin",
+          "kind": "retirement_occupied_interrupted_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        },
+        {
+          "id": "ord_pending_evacuation_disconnect_and_relogin",
+          "kind": "retirement_occupied_interrupted_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_occupied_outside",
+      "title": "Occupied retirement preserves an outside-family group leader while grouped and solo actors evacuate",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "pressure"
+      ],
+      "tests": [
+        {
+          "id": "rryatt_outside_leader_and_solo_retirement",
+          "kind": "retirement_occupied_outside_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        },
+        {
+          "id": "ord_outside_leader_and_solo_retirement",
+          "kind": "retirement_occupied_outside_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_occupied_retirement",
+      "title": "Whole-group linked-level and owned-ship evacuation with distributed retirement",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "pressure"
+      ],
+      "tests": [
+        {
+          "id": "rryatt_group_evacuates_then_reaps",
+          "kind": "retirement_occupied_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        },
+        {
+          "id": "ord_group_evacuates_then_reaps",
+          "kind": "retirement_occupied_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "pressure"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_planet_supervisor_stop",
+      "title": "Planet supervisor loss at the distributed StopPlanet boundary",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "service_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        },
+        {
+          "id": "rryatt_planet_supervisor_loss",
+          "kind": "retirement_planet_supervisor_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "falcon_planet_supervisor_loss",
+          "kind": "retirement_planet_supervisor_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "falcon"
+          }
+        },
+        {
+          "id": "ord_planet_supervisor_loss",
+          "kind": "retirement_planet_supervisor_stopping_planet",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_retired_offline_recovery",
+      "title": "Real offline linked-level and owned-ship saves recover after proven retirement and Central restart, then retain the replacement on relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "rryatt_offline_retirement_restart_and_relogin",
+          "kind": "retirement_offline_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "family": "rryatt"
+          }
+        },
+        {
+          "id": "ord_offline_retirement_restart_and_relogin",
+          "kind": "retirement_offline_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_retired_ship_point",
+      "title": "Owned ship saved away from its launch point survives actual retirement, Central restart and full unload/relogin",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "offline"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "non_default_owned_ship_retirement_restart_and_relogin",
+          "kind": "retirement_offline_recovery",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "offline": "offline",
+            "family": "ord"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_retirement_cohort_components",
+      "title": "Whole-cohort reservation handoff and relocation authority components; live integration is a separate gate",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "cohort_seats_and_authority",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_cohort"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_retirement_linked",
+      "title": "Stage 7 retirement foundation: fenced lifecycle and unchanged linked-level group behavior",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "retirement_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_foundation"
+          }
+        },
+        {
+          "id": "linked_levels_group_positions_and_reconnect",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_retirement_native",
+      "title": "Stage 7 retirement foundation: fenced lifecycle",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "retirement_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_foundation"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_service_fault_guards",
+      "title": "ELF64 retirement service signal and exact container/process identity refusal guards; no live fault injection",
+      "category": "unit",
+      "roles": [],
+      "tests": [
+        {
+          "id": "retirement_service_identity_and_signal_guards",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_fault_services"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_station_combat",
+      "title": "Post-retirement Friend Finder, station copy affinity and real space combat windows",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "friend_finder_and_station_affinity",
+          "kind": "split_friend",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "real_space_quiet_protection_and_cancellation",
+          "kind": "combat_windows",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_worker_supervisor",
+      "title": "Stage 7 worker freeze and exact supervisor launch/reap fencing",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "worker_supervisor_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "worker_supervisor"
+          }
+        },
+        {
+          "id": "committed_prefix_online_at_own_linked_levels",
+          "kind": "world_save",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "linked_group_level_position_and_reconnect_regression",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage7_world_save",
+      "title": "Stage 7 committed world persistence prefixes and linked-level regression",
+      "category": "regression",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "world_save_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "world_save"
+          }
+        },
+        {
+          "id": "committed_prefix_online_at_own_linked_levels",
+          "kind": "world_save",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "linked_group_level_position_and_reconnect_regression",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage8_capacity_burst",
+      "title": "Three five-pilot launch bursts hold four Ord seats through real queue expiry, release and fresh-request recovery",
+      "category": "system",
+      "roles": [
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "fifth"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "first_burst_expiry_release_and_retry",
+          "kind": "capacity_race",
+          "options": {
+            "actors": [
+              "first",
+              "second",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        },
+        {
+          "id": "second_burst_expiry_release_and_retry",
+          "kind": "capacity_race",
+          "options": {
+            "actors": [
+              "first",
+              "second",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        },
+        {
+          "id": "third_burst_expiry_release_and_retry",
+          "kind": "capacity_race",
+          "options": {
+            "actors": [
+              "first",
+              "second",
+              "third",
+              "fourth",
+              "fifth"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage8_capacity_cycles",
+      "title": "Measured Ord and linked Rryatt demand, idle retirement and new-copy wake",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "driver_guards",
+          "kind": "driver_unit",
+          "options": {}
+        },
+        {
+          "id": "retirement_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "retirement_foundation"
+          }
+        },
+        {
+          "id": "linked_rryatt_cycle",
+          "kind": "automatic_retirement_rryatt",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        },
+        {
+          "id": "ord_cycle",
+          "kind": "automatic_retirement_ord",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "stage8_idle_growth",
+      "title": "Force Ord overflow with three pilots, grow linked Rryatt, then fully unload all actors for idle measurements",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member",
+        "filler"
+      ],
+      "tests": [
+        {
+          "id": "ord_overflow_and_ship_round_trip",
+          "kind": "space_split",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "filler": "filler"
+          }
+        },
+        {
+          "id": "linked_rryatt_growth_and_exit",
+          "kind": "rryatt_demand",
+          "options": {
+            "leader": "leader",
+            "member": "member"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "station_shuttle",
+      "title": "Station login, radial/SUI travel to Gamma and back, logout and exact save",
+      "category": "regression",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "login_logout_save",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor"
+          }
+        },
+        {
+          "id": "gamma_radial_transition",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_dungeon"
+          }
+        },
+        {
+          "id": "station_radial_return",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "prepare_terminal": true,
+            "expect_family": "npe_space_station"
+          }
+        },
+        {
+          "id": "repeat_login_logout_save",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "terminal_position_setup",
+      "title": "Explicit station-shuttle proximity setup, logout and exact saved point",
+      "category": "functional",
+      "roles": [
+        "actor"
+      ],
+      "tests": [
+        {
+          "id": "save_station_terminal_pose",
+          "kind": "protocol_session",
+          "options": {
+            "role": "actor",
+            "position_terminal_only": true,
+            "expect_family": "npe_space_station"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_families",
+      "title": "All eighteen eligible whole-world families: native admission, authored placement, durable recovery and retirement fences",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "all_world_family_production_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "whole_world_families"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live",
+      "title": "All eighteen worlds: real server entry, current group, original ship, full unload and point recovery",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_kashyyyk_dead_forest",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "kashyyyk_dead_forest"
+          }
+        },
+        {
+          "id": "world_kashyyyk_hunting",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "kashyyyk_hunting"
+          }
+        },
+        {
+          "id": "world_space_corellia",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_corellia"
+          }
+        },
+        {
+          "id": "world_space_corellia_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_corellia_2"
+          }
+        },
+        {
+          "id": "world_space_dantooine",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_dantooine"
+          }
+        },
+        {
+          "id": "world_space_dathomir",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_dathomir"
+          }
+        },
+        {
+          "id": "world_space_endor",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_endor"
+          }
+        },
+        {
+          "id": "world_space_heavy1",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_heavy1"
+          }
+        },
+        {
+          "id": "world_space_kashyyyk",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_kashyyyk"
+          }
+        },
+        {
+          "id": "world_space_light1",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_light1"
+          }
+        },
+        {
+          "id": "world_space_lok",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_lok"
+          }
+        },
+        {
+          "id": "world_space_naboo",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_naboo"
+          }
+        },
+        {
+          "id": "world_space_naboo_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_naboo_2"
+          }
+        },
+        {
+          "id": "world_space_nova_orion",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_nova_orion"
+          }
+        },
+        {
+          "id": "world_space_ord_mantell",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_ord_mantell"
+          }
+        },
+        {
+          "id": "world_space_tatooine",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_tatooine"
+          }
+        },
+        {
+          "id": "world_space_tatooine_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_tatooine_2"
+          }
+        },
+        {
+          "id": "world_space_yavin4",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_yavin4"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_kashyyyk_dead_forest",
+      "title": "Whole-world actor regression: kashyyyk_dead_forest",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_kashyyyk_dead_forest",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "kashyyyk_dead_forest"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_kashyyyk_hunting",
+      "title": "Whole-world actor regression: kashyyyk_hunting",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_kashyyyk_hunting",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "kashyyyk_hunting"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_kashyyyk_main",
+      "title": "Kachirho remains one authoritative world; parallel-copy policy and travel refusal",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "kachirho_single_native",
+          "kind": "native_gate",
+          "options": {
+            "gate": "single_world"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_corellia",
+      "title": "Whole-world actor regression: space_corellia",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_corellia",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_corellia"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_corellia_2",
+      "title": "Whole-world actor regression: space_corellia_2",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_corellia_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_corellia_2"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_dantooine",
+      "title": "Whole-world actor regression: space_dantooine",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_dantooine",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_dantooine"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_dathomir",
+      "title": "Whole-world actor regression: space_dathomir",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_dathomir",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_dathomir"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_endor",
+      "title": "Whole-world actor regression: space_endor",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_endor",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_endor"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_heavy1",
+      "title": "Whole-world actor regression: space_heavy1",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_heavy1",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_heavy1"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_kashyyyk",
+      "title": "Whole-world actor regression: space_kashyyyk",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_kashyyyk",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_kashyyyk"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_light1",
+      "title": "Whole-world actor regression: space_light1",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_light1",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_light1"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_lok",
+      "title": "Whole-world actor regression: space_lok",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_lok",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_lok"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_naboo",
+      "title": "Whole-world actor regression: space_naboo",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_naboo",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_naboo"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_naboo_2",
+      "title": "Whole-world actor regression: space_naboo_2",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_naboo_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_naboo_2"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_nova_orion",
+      "title": "Whole-world actor regression: space_nova_orion",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_nova_orion",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_nova_orion"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_ord_mantell",
+      "title": "Whole-world actor regression: space_ord_mantell",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_ord_mantell",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_ord_mantell"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_tatooine",
+      "title": "Whole-world actor regression: space_tatooine",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_tatooine",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_tatooine"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_tatooine_2",
+      "title": "Whole-world actor regression: space_tatooine_2",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_tatooine_2",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_tatooine_2"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "whole_world_live_space_yavin4",
+      "title": "Whole-world actor regression: space_yavin4",
+      "category": "system",
+      "roles": [
+        "leader",
+        "member"
+      ],
+      "tests": [
+        {
+          "id": "world_space_yavin4",
+          "kind": "whole_world_family",
+          "options": {
+            "leader": "leader",
+            "member": "member",
+            "definition": "space_yavin4"
+          }
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "world_driver_actions",
+      "title": "Eighteen-world fixture action fences, authoritative outcome assertions and saved live matrix",
+      "category": "regression",
+      "roles": [],
+      "tests": [
+        {
+          "id": "world_actor_action_components",
+          "kind": "native_gate",
+          "options": {
+            "gate": "world_driver_actions"
+          }
+        }
+      ]
+    }
+  ]
+}

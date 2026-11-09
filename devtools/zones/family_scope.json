@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "revision": "2026-11-02-kachirho-single-authoritative-world",
+  "definitions": [
+    {
+      "definition": "adventure1",
+      "mode": "session_host"
+    },
+    {
+      "definition": "adventure2",
+      "mode": "session_host"
+    },
+    {
+      "definition": "corellia",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "dantooine",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "dathomir",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "dungeon1",
+      "mode": "session_host"
+    },
+    {
+      "definition": "endor",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "kashyyyk_dead_forest",
+      "mode": "dynamic_area"
+    },
+    {
+      "definition": "kashyyyk_hunting",
+      "mode": "dynamic_area"
+    },
+    {
+      "definition": "kashyyyk_main",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "kashyyyk_north_dungeons",
+      "mode": "session_host"
+    },
+    {
+      "definition": "kashyyyk_pob_dungeons",
+      "mode": "session_host"
+    },
+    {
+      "definition": "kashyyyk_rryatt_trail",
+      "mode": "dynamic_area"
+    },
+    {
+      "definition": "kashyyyk_south_dungeons",
+      "mode": "session_host"
+    },
+    {
+      "definition": "lok",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "mustafar",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "naboo",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "rori",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "space_corellia",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_corellia_2",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_dantooine",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_dathomir",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_endor",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_heavy1",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_kashyyyk",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_light1",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_lok",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_naboo",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_naboo_2",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_nova_orion",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_npe_falcon",
+      "mode": "session_host"
+    },
+    {
+      "definition": "space_ord_mantell",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_tatooine",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_tatooine_2",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "space_yavin4",
+      "mode": "piloted_space"
+    },
+    {
+      "definition": "talus",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "tatooine",
+      "mode": "persistent_single"
+    },
+    {
+      "definition": "tutorial",
+      "mode": "owned_room_host"
+    },
+    {
+      "definition": "yavin4",
+      "mode": "persistent_single"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_live_capacity",
+  "title": "Live Rryatt final-seat contention, linked-level accounting, queued release and bounded exhaustion",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member",
+    "filler"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "linked_capacity_components",
+      "kind": "native_gate",
+      "options": {
+        "gate": "rryatt_capacity"
+      }
+    },
+    {
+      "id": "live_two_seat_common_set_exhaustion",
+      "kind": "rryatt_live_capacity",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "filler"
+      }
+    }
+  ]
+}

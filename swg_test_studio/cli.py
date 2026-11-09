@@ -68,6 +68,8 @@ def main(argv=None):
         if action == "run":
             child.add_argument("--keep-running", action="store_true")
             child.add_argument("--source", type=Path, help="Use this source folder instead of the saved selection")
+    child = commands.add_parser("install-server-tools", help="Copy the bundled tools into a WhiteNGold server checkout")
+    child.add_argument("--source", type=Path, required=True)
     child = commands.add_parser("select-source", help="Choose the SWG source folder")
     child.add_argument("--source", type=Path, required=True)
     child = commands.add_parser("test-servers", help="List verified Docker test servers for the selected source")
@@ -136,6 +138,9 @@ def main(argv=None):
             emit({"saved": str(library.save(read_json(args.file), replace=args.replace))})
         elif args.command == "export-regression":
             emit({"saved": str(export_regression(args.server_checkout, args.output))})
+        elif args.command == "install-server-tools":
+            from .server_tools import install_server_tools
+            emit({"installed": str(install_server_tools(args.source))})
         elif args.command == "environment-template":
             emit(environment_template())
         elif args.command in ("select-source", "test-servers"):

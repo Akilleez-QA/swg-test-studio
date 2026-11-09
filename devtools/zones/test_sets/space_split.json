@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "space_split",
+  "title": "Demand overflow and same-family group consolidation preserve each original ship and space point",
+  "category": "system",
+  "roles": ["leader", "member", "filler"],
+  "tests": [{"id": "separate_space_copies_consolidate", "kind": "space_split", "options": {"leader": "leader", "member": "member", "filler": "filler"}}]
+}

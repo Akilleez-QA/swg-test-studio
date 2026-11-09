@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "id": "stage5_release",
+  "title": "Complete Stage 5 release regression: native gates, terminals, groups, ships, combat, recovery and capacity",
+  "category": "regression",
+  "roles": [
+    "leader",
+    "member",
+    "third",
+    "fourth",
+    "fifth"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "native_capacity",
+      "kind": "native_gate",
+      "options": {
+        "gate": "capacity"
+      }
+    },
+    {
+      "id": "native_combat",
+      "kind": "native_gate",
+      "options": {
+        "gate": "combat"
+      }
+    },
+    {
+      "id": "native_recovery",
+      "kind": "native_gate",
+      "options": {
+        "gate": "recovery"
+      }
+    },
+    {
+      "id": "native_routing",
+      "kind": "native_gate",
+      "options": {
+        "gate": "routing"
+      }
+    },
+    {
+      "id": "ship_launch_group_land_relaunch",
+      "kind": "ship_group",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "station_login_logout",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "expect_family": "npe_space_station"
+      }
+    },
+    {
+      "id": "gamma_entry",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "prepare_terminal": true,
+        "expect_scene": "terrain/dungeon1.trn",
+        "expect_family": "npe_space_dungeon"
+      }
+    },
+    {
+      "id": "gamma_return",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "prepare_terminal": true,
+        "expect_scene": "terrain/dungeon1.trn",
+        "expect_family": "npe_space_station"
+      }
+    },
+    {
+      "id": "station_relogin",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "expect_family": "npe_space_station"
+      }
+    },
+    {
+      "id": "pending_arrival_partition_crash_reconnect",
+      "kind": "pending_faults",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "friend_finder_and_public_consolidation",
+      "kind": "split_friend",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "separate_space_consolidation",
+      "kind": "space_split",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "third"
+      }
+    },
+    {
+      "id": "combat_quiet_protection_and_cancellation",
+      "kind": "combat_windows",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "maintenance_restart_before_growth",
+      "kind": "fixture_restart",
+      "options": {
+        "actors": [
+          "leader",
+          "member",
+          "third",
+          "fourth",
+          "fifth"
+        ]
+      }
+    },
+    {
+      "id": "concurrent_capacity_and_expiry",
+      "kind": "capacity_race",
+      "options": {
+        "actors": [
+          "leader",
+          "member",
+          "third",
+          "fourth",
+          "fifth"
+        ]
+      }
+    }
+  ]
+}

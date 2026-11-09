@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_linked",
+  "title": "All six Rryatt sets: original guide conversations, bidirectional links, eight entrance returns and deepest-level saved login",
+  "category": "regression",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_and_linked_assertion_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_request_and_controller_guards",
+      "kind": "native_gate",
+      "options": {
+        "gate": "kashyyyk"
+      }
+    },
+    {
+      "id": "linked_sets_1_and_2",
+      "kind": "rryatt_linked",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 0
+      }
+    },
+    {
+      "id": "linked_sets_3_and_4",
+      "kind": "rryatt_linked",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 1
+      }
+    },
+    {
+      "id": "linked_sets_5_and_6",
+      "kind": "rryatt_linked",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "pair": 2
+      }
+    }
+  ]
+}

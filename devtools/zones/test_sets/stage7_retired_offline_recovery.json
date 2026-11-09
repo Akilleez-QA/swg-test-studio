@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "stage7_retired_offline_recovery",
+  "title": "Real offline linked-level and owned-ship saves recover after proven retirement and Central restart, then retain the replacement on relogin",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member",
+    "offline"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_offline_retirement_restart_and_relogin",
+      "kind": "retirement_offline_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "offline": "offline",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "ord_offline_retirement_restart_and_relogin",
+      "kind": "retirement_offline_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "offline": "offline",
+        "family": "ord"
+      }
+    }
+  ]
+}

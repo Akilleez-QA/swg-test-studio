@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "driver_unit",
+  "title": "Driver identity, authentication mode, SUI selection and manifest guards",
+  "category": "unit",
+  "roles": [],
+  "tests": [{"id": "protocol_guards", "kind": "driver_unit", "options": {}}]
+}

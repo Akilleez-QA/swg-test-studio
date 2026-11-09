@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "stage5_native",
+  "title": "Stage 5 ELF64 capacity, combat, durable recovery and routing regression gates",
+  "category": "regression",
+  "roles": [],
+  "tests": [
+    {"id": "capacity_and_budget", "kind": "native_gate", "options": {"gate": "capacity"}},
+    {"id": "combat_and_protection", "kind": "native_gate", "options": {"gate": "combat"}},
+    {"id": "durable_recovery", "kind": "native_gate", "options": {"gate": "recovery"}},
+    {"id": "routing_and_quests", "kind": "native_gate", "options": {"gate": "routing"}}
+  ]
+}

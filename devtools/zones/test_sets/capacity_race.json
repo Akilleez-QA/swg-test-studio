@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "capacity_race",
+  "title": "Five concurrent ship launches compete for four seats across two Ord worlds",
+  "category": "system",
+  "roles": ["first", "second", "third", "fourth", "fifth"],
+  "tests": [{"id": "growth_exhaustion_and_retry", "kind": "capacity_race", "options": {"actors": ["first", "second", "third", "fourth", "fifth"]}}]
+}

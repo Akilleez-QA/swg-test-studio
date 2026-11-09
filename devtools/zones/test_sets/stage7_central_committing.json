@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "stage7_central_committing",
+  "title": "Central loss at committing with exact worker and database holds; all-family generation recovery",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

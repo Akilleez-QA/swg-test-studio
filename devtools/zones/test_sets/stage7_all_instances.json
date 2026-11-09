@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "id": "stage7_all_instances",
+  "title": "All-scene retirement guards; live Falcon, Ord and linked Rryatt retirement/wake with ship, group and station regressions",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "distributed_shutdown_native",
+      "kind": "native_gate",
+      "options": {
+        "gate": "distributed_shutdown"
+      }
+    },
+    {
+      "id": "whole_empty_linked_world_retire_and_new_id_wake",
+      "kind": "distributed_shutdown",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "falcon_and_ord_retire_wake_and_lease_guards",
+      "kind": "reviewed_shutdown",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "linked_group_level_position_and_reconnect_regression",
+      "kind": "rryatt_demand",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "ship_group_round_trip_after_retirements",
+      "kind": "ship_group",
+      "options": {
+        "leader": "leader",
+        "member": "member"
+      }
+    },
+    {
+      "id": "gamma_entry_after_retirements",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "prepare_terminal": true,
+        "expect_scene": "terrain/dungeon1.trn",
+        "expect_family": "npe_space_dungeon"
+      }
+    },
+    {
+      "id": "gamma_return_after_retirements",
+      "kind": "protocol_session",
+      "options": {
+        "role": "leader",
+        "prepare_terminal": true,
+        "expect_scene": "terrain/dungeon1.trn",
+        "expect_family": "npe_space_station"
+      }
+    }
+  ]
+}

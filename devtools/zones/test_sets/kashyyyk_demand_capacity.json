@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "kashyyyk_demand_capacity",
+  "title": "Rryatt two-world four-seat exhaustion, request expiry and fresh retry",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member",
+    "third",
+    "fourth",
+    "fifth"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "native_guards",
+      "kind": "native_gate",
+      "options": {
+        "gate": "rryatt_capacity"
+      }
+    },
+    {
+      "id": "five_real_requests_and_expiry",
+      "kind": "rryatt_demand_capacity",
+      "options": {
+        "actors": [
+          "leader",
+          "member",
+          "third",
+          "fourth",
+          "fifth"
+        ]
+      }
+    }
+  ]
+}

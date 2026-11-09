@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 import zipfile
 
+from swg_test_studio.server_tools import bundled_paths
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -15,6 +17,8 @@ def main():
     sources += sorted((root / "swg_test_studio").glob("*.py"))
     sources += sorted((root / "swg_test_studio/examples").glob("*.json"))
     sources += sorted((root / "tests").glob("*.py"))
+    sources += sorted((root / "swg_test_studio/collections").glob("*.json"))
+    sources += bundled_paths()
     output = args.output.absolute()
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("xb") as stream, zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as archive:

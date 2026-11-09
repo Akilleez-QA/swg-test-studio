@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "stage7_falcon_expired_room",
+  "title": "Production Falcon session expiry permits empty host retirement, followed by phase-2 private-room recovery and relogin",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member",
+    "offline"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "falcon_expired_room_retirement_restart_and_relogin",
+      "kind": "retirement_offline_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "offline": "offline",
+        "family": "falcon"
+      }
+    }
+  ]
+}

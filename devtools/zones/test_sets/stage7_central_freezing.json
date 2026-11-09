@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "stage7_central_freezing",
+  "title": "Central loss at freezing with exact worker and database holds; all-family generation recovery",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

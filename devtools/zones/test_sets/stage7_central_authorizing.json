@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "stage7_central_authorizing",
+  "title": "Central loss with DatabaseServer authorization held; all-family recovery with committed saved actors",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

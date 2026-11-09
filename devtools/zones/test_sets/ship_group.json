@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "ship_group",
+  "title": "Owned-ship launch, group placement, landing, relaunch and full saves",
+  "category": "system",
+  "roles": ["leader", "member"],
+  "tests": [
+    {"id": "ship_group_round_trip", "kind": "ship_group", "options": {"leader": "leader", "member": "member"}}
+  ]
+}

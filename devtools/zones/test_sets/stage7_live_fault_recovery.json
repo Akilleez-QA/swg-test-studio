@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "stage7_live_fault_recovery",
+  "title": "Live sealed worker loss before freeze proof, durable quarantine, proven-stop restart and higher-generation retirement for every eligible family",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_sealed_loss_restart_and_reap",
+      "kind": "retirement_fault_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_sealed_loss_restart_and_reap",
+      "kind": "retirement_fault_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_sealed_loss_restart_and_reap",
+      "kind": "retirement_fault_recovery",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

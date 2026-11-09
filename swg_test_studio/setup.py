@@ -16,7 +16,8 @@ def source_folder(path):
     if path.name.casefold() == "src":
         path = path.parent
     if not ((path / "src").is_dir() and (path / "devtools/zones/protocol_driver.py").is_file()):
-        raise ValueError("Choose the SWG source folder that contains src and devtools. You can also choose its src folder.")
+        raise ValueError("Choose the WhiteNGold server folder that contains src and devtools, or its src folder. "
+                         "If this server checkout has no devtools, run swg-tests.py install-server-tools --source PATH.")
     return path
 
 

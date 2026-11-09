@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "revision": "2026-09-29",
+  "groups": [
+    {
+      "id": "falcon",
+      "kind": "duplicate_scene",
+      "scenes": [
+        "space_npe_falcon",
+        "space_npe_falcon_2",
+        "space_npe_falcon_3"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "dungeon_session",
+      "review": "required"
+    },
+    {
+      "id": "ord_mantell",
+      "kind": "duplicate_scene",
+      "scenes": [
+        "space_ord_mantell",
+        "space_ord_mantell_2",
+        "space_ord_mantell_3",
+        "space_ord_mantell_4",
+        "space_ord_mantell_5",
+        "space_ord_mantell_6"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "player_and_station",
+      "review": "required"
+    },
+    {
+      "id": "space_corellia",
+      "kind": "duplicate_candidate",
+      "scenes": [
+        "space_corellia",
+        "space_corellia_2"
+      ],
+      "warm_minimum": 2,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "space_naboo",
+      "kind": "duplicate_candidate",
+      "scenes": [
+        "space_naboo",
+        "space_naboo_2"
+      ],
+      "warm_minimum": 2,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "space_tatooine",
+      "kind": "duplicate_candidate",
+      "scenes": [
+        "space_tatooine",
+        "space_tatooine_2"
+      ],
+      "warm_minimum": 2,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_main",
+      "kind": "distinct_scene",
+      "scenes": [
+        "kashyyyk_main"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_dead_forest",
+      "kind": "distinct_scene",
+      "scenes": [
+        "kashyyyk_dead_forest"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_hunting",
+      "kind": "distinct_scene",
+      "scenes": [
+        "kashyyyk_hunting"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "player",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_rryatt_trail",
+      "kind": "instance_host",
+      "scenes": [
+        "kashyyyk_rryatt_trail"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "buildout_instance",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_north_dungeons",
+      "kind": "instance_host",
+      "scenes": [
+        "kashyyyk_north_dungeons"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "buildout_instance",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_south_dungeons",
+      "kind": "instance_host",
+      "scenes": [
+        "kashyyyk_south_dungeons"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "buildout_instance",
+      "review": "required"
+    },
+    {
+      "id": "kashyyyk_pob_dungeons",
+      "kind": "instance_host",
+      "scenes": [
+        "kashyyyk_pob_dungeons"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "buildout_instance",
+      "review": "required"
+    },
+    {
+      "id": "space_kashyyyk",
+      "kind": "distinct_scene",
+      "scenes": [
+        "space_kashyyyk"
+      ],
+      "warm_minimum": 1,
+      "capacity_unit": "player",
+      "review": "required"
+    }
+  ]
+}

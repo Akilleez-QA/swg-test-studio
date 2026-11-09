@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "id": "stage7_central_fault_matrix",
+  "title": "Central loss at every retirement boundary across Falcon, Ord and linked Rryatt; saved actors and exact generation recovery",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "service_and_signal_guards",
+      "kind": "native_gate",
+      "options": {
+        "gate": "retirement_fault_services"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_fencing",
+      "kind": "retirement_central_fencing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_fencing",
+      "kind": "retirement_central_fencing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_fencing",
+      "kind": "retirement_central_fencing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_authorizing",
+      "kind": "retirement_central_authorizing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_freezing",
+      "kind": "retirement_central_freezing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_committing",
+      "kind": "retirement_central_committing",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_stopping_games",
+      "kind": "retirement_central_stopping_games",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_stopping_games",
+      "kind": "retirement_central_stopping_games",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_stopping_games",
+      "kind": "retirement_central_stopping_games",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    },
+    {
+      "id": "rryatt_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

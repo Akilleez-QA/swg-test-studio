@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "stage7_central_stopping_planet",
+  "title": "Central loss at stopping_planet with all supervisor fences; all-family generation recovery",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member"
+  ],
+  "tests": [
+    {
+      "id": "driver_guards",
+      "kind": "driver_unit",
+      "options": {}
+    },
+    {
+      "id": "rryatt_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "rryatt"
+      }
+    },
+    {
+      "id": "falcon_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "falcon"
+      }
+    },
+    {
+      "id": "ord_central_loss_during_stopping_planet",
+      "kind": "retirement_central_stopping_planet",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "family": "ord"
+      }
+    }
+  ]
+}

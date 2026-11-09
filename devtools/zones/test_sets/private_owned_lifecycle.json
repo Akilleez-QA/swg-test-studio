@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "private_owned_lifecycle",
+  "title": "Original solo private owner entry/close/repeat with authored Corellia exit and stationary witness",
+  "category": "system",
+  "roles": ["actor", "witness"],
+  "tests": [
+    {
+      "id": "private_close_component_regression",
+      "kind": "native_gate",
+      "options": { "gate": "private_callbacks" }
+    },
+    {
+      "id": "owned_private_room_real_actor",
+      "kind": "private_owned_lifecycle",
+      "options": { "leader": "actor", "member": "witness" }
+    }
+  ]
+}

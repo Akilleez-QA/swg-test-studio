@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "stage7_occupied_interrupted",
+  "title": "Pending occupied evacuation survives disconnect and cohort cancellation without another seat",
+  "category": "system",
+  "roles": [
+    "leader",
+    "member",
+    "pressure"
+  ],
+  "tests": [
+    {
+      "id": "rryatt_pending_evacuation_disconnect_and_relogin",
+      "kind": "retirement_occupied_interrupted_rryatt",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "pressure"
+      }
+    },
+    {
+      "id": "ord_pending_evacuation_disconnect_and_relogin",
+      "kind": "retirement_occupied_interrupted_ord",
+      "options": {
+        "leader": "leader",
+        "member": "member",
+        "filler": "pressure"
+      }
+    }
+  ]
+}
