@@ -89,6 +89,9 @@ def main(argv=None):
     child.add_argument("--keep-running", action="store_true")
     child.add_argument("--source", type=Path, help="Use this source folder instead of the saved selection")
     commands.add_parser("environment-template", help="Print an editable environment example (contains no credentials)")
+    child = commands.add_parser("install-agent-fixture",
+                                help="Compile and load the arrange/inspect fixture into an isolated test server")
+    child.add_argument("--environment", type=Path, required=True)
     child = commands.add_parser("record-start")
     target = child.add_mutually_exclusive_group()
     target.add_argument("--environment", type=Path)
@@ -109,7 +112,7 @@ def main(argv=None):
         launch(args.workspace, args.collection)
         return 0
     linux_commands = ("run", "run-selected", "plan-batch", "run-batch", "select-source", "test-servers",
-                      "register-test-server", "docker-check")
+                      "register-test-server", "docker-check", "install-agent-fixture")
     if os.name == "nt" and (args.command in linux_commands or args.command.startswith("record-") or
                             args.command == "plan" and not args.environment):
         try:
@@ -136,6 +139,9 @@ def main(argv=None):
             emit({"saved": str(library.save(read_json(args.file), replace=args.replace))})
         elif args.command == "export-regression":
             emit({"saved": str(export_regression(args.server_checkout, args.output))})
+        elif args.command == "install-agent-fixture":
+            from .agent_fixture import install
+            install(environment(args.environment), emit)
         elif args.command == "environment-template":
             emit(environment_template())
         elif args.command in ("select-source", "test-servers"):

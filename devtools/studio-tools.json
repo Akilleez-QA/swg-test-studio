@@ -21,6 +21,7 @@
     "zones/family_scope.json": "f55c7d706d9e2f7cc7bff78485ffa2ee3c8f25d5e5197be6a02022eeb3c8da03",
     "zones/fixture_journal_maintenance.py": "9c727ffb2d6c5141b0f593314a8a110ad6d5528f6d0882dc79f62a50a9941fe8",
     "zones/fixture_overlay.py": "25b544d3ea5fdf3682f6b2b7e57274f358b15ab711b8ccbd6da4fb894320991d",
+    "zones/fixtures/agent_fixture.java": "c690d8a2cf1f699d9bcd88fe6a72a106e4351c4e48641737f24cd6aa07f3a035",
     "zones/fixtures/ground_cell_entry.java": "02c5f29e20fdb4ebe414b621aa59fe370fa7ab7ed9c49aeceb5052f647fd59f1",
     "zones/fixtures/protocol_bot.java": "7457b2c1b6f2a4af79595f523d369179e314594d46844a714d14dc8662c9968f",
     "zones/ground_cell_fixture.py": "5da0e4a34973248c9227b8da6be18a1799a5ccaf220ab60461878faf839f32e4",

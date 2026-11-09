@@ -12,6 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from .model import compile_suite, exact, ROLE
+from .agent_fixture import OPS as AGENT_OPS
 from .server_tools import load_tool, source_folder, tool_environment, verified_tool_root
 from .store import read_json, write_json
 
@@ -73,7 +74,7 @@ def plan(suite, env):
     ground_or_legacy_setup = any(
         any(case["options"].get(key, False) for key in
             ("prepare_terminal", "prepare_start", "prepare_between_actions")) or
-        case["kind"] not in ("protocol_session", "studio_journey", "studio_action_sequence")
+        case["kind"] not in ("protocol_session", "studio_journey", "studio_action_sequence", "agent_fixture")
         for case in cases if case["kind"] != "driver_unit"
     )
     return {"schema_version": 1, "suite": suite["id"], "environment": env["name"],
@@ -84,6 +85,8 @@ def plan(suite, env):
                 "fixture_proximity_setup": ground_or_legacy_setup or bool(action_kinds & {"launch", "land"}),
                 "ship_pilot_reward_and_proximity_setup": "launch" in action_kinds,
                 "group_cleanup_possible": "form_group" in action_kinds,
+                "agent_fixture_changes": sorted({case["options"]["op"] for case in cases
+                                                 if case["kind"] == "agent_fixture" and AGENT_OPS[case["options"]["op"]][1]}),
                 "service_restart": False, "client_changed": False}}
 
 
@@ -115,7 +118,7 @@ def run_suite(suite, env, workspace, emit=print):
     selected = plan(suite, env)
     driver, legacy = driver_modules(env)
     manifest = selected["manifest"]
-    ordinary = dict(manifest, tests=[c for c in manifest["tests"] if c["kind"] not in ("studio_journey", "studio_action_sequence")])
+    ordinary = dict(manifest, tests=[c for c in manifest["tests"] if c["kind"] not in ("studio_journey", "studio_action_sequence", "agent_fixture")])
     if ordinary["tests"]:
         legacy.validate(ordinary)
     operation = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + secrets.token_hex(4)
@@ -150,7 +153,12 @@ def run_suite(suite, env, workspace, emit=print):
                 report["cases"].append(row)
                 emit({"event": "case_started", "id": case["id"], "operation": operation})
                 try:
-                    if case["kind"] == "studio_journey":
+                    if case["kind"] == "agent_fixture":
+                        from .agent_fixture import run_live as run_fixture
+                        with case_log.open("x") as log, contextlib.redirect_stdout(log):
+                            row["artifact"] = run_fixture(case["options"], env, selected["bindings"][case["options"]["role"]])
+                        row.update(exit_code=0, timed_out=False, passed=True)
+                    elif case["kind"] == "studio_journey":
                         from .journey import run_live
                         with case_log.open("x") as log, contextlib.redirect_stdout(log):
                             row["artifact"] = run_live(case["options"], env, selected["bindings"][case["options"]["role"]])

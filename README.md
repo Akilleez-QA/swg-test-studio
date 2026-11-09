@@ -407,6 +407,65 @@ The live Ord recording and replay gate passed for one dedicated pilot. Group
 recording and replay have component coverage. Live group acceptance requires a
 second available dedicated actor.
 
+## Arrange and inspect with the agent fixture
+
+`agent_fixture` steps set up and check server state around ordinary-action steps:
+put the bot in a room facing a direction, move a building or a piece of furniture,
+grant expertise, skills or schematics, give static items, and read back rooms,
+contents and objects. The test character itself still acts only through the
+protocol driver; the fixture prepares and inspects, it never plays for the bot.
+
+```json
+{"id": "in_the_study", "action": "agent_fixture",
+ "options": {"role": "actor", "op": "place",
+             "args": ["<buildingOid>", "r2", "1.5", "0", "-2.0", "90"],
+             "expect": {"cell": "r2"}}}
+```
+
+Install it once per prepared test server with
+`python3 swg-tests.py install-agent-fixture --environment environment.json`: it compiles the fixture
+against that server's own script classes, writes it where the fixture overlay re-applies it on every
+game start, and reloads it on each game server without a restart.
+
+The server side is `devtools/zones/fixtures/agent_fixture.java`
+(`script.fixture.agent_fixture`), installed by the same fixture overlay as
+`protocol_bot`. It shares that fixture's limits: it answers only on an isolated
+fixture (`GameServer.clientIsolationFixture=1`, a `WGC_` copied schema), only for
+one exact registered non-god bot (`oid:station:Cap…`), and only for objects in the
+bot's scene within 256 m or inside the bot or its building. Every method is typed;
+there is no command line, script name or expression to pass through.
+
+Studio sends the call as one console message to the fixture's private CentralServer
+console, on the game server the existing bot query reports for that bot, and fails
+the step on any status other than `ok` or on an `expect` mismatch. The run plan lists
+the mutating operations a suite uses under `agent_fixture_changes`.
+
+| Operation | Arguments | Changes state |
+|---|---|---|
+| `inspect` | - | no |
+| `nearby` | radius | no |
+| `cells` | oid | no |
+| `contents` | oid | no |
+| `describe` | oid | no |
+| `items` | - | no |
+| `structure` | oid | no |
+| `countIn` | oid | no |
+| `tryPut` | oid, oid | yes |
+| `place` | oid, cell, coord, coord, coord, yaw | yes |
+| `warp` | coord, coord, coord | yes |
+| `moveInto` | oid, oid, cell, coord, coord, coord | yes |
+| `transform` | oid, coord, coord, yaw | yes |
+| `setDown` | oid, cell, coord, coord, coord, oids | yes |
+| `scale` | oid, scale | yes |
+| `grantExpertise` | trees (optional) | yes |
+| `grantSkills` | regex | yes |
+| `grantSchematics` | - | yes |
+| `itemBonuses` | oid, mods | yes |
+| `giveStatic` | names | yes |
+| `give` | oid | yes |
+| `completeCollection` | name | yes |
+| `clearDecor` | oid, tag | yes |
+
 ## Verify and coverage limits
 
 ```text

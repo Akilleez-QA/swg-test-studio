@@ -112,6 +112,9 @@ def validate(data, *, runnable=False):
                     any(not isinstance(v, str) or v not in roles for v in bindings.values()) or
                     len(set(bindings.values())) != len(bindings)):
                 raise ValueError("Bind each recipe role to a distinct declared role")
+        elif step["action"] == "agent_fixture":
+            from .agent_fixture import validate as validate_fixture
+            validate_fixture(options, roles)
         elif step["action"] == "recorded_observation":
             exact(options, ("summary",), "recorded-observation")
             if not isinstance(options["summary"], str) or not 1 <= len(options["summary"]) <= 300:
@@ -136,6 +139,8 @@ def compile_suite(data, legacy_dir):
             cases.append({"id": step["id"], "kind": "studio_journey", "options": step["options"]})
         elif step["action"] == "action_sequence":
             cases.append({"id": step["id"], "kind": "studio_action_sequence", "options": step["options"]})
+        elif step["action"] == "agent_fixture":
+            cases.append({"id": step["id"], "kind": "agent_fixture", "options": step["options"]})
         else:
             options = step["options"]
             original = loads((legacy_dir / (options["suite"] + ".json")).read_text(encoding="utf-8"))
