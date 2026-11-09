@@ -10,7 +10,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
-    sources = [root / name for name in ("README.md", "pyproject.toml", "swg-tests.py", "swg-tests.ps1", "build_release.py")]
+    sources = [root / name for name in ("README.md", "pyproject.toml", "swg-tests.py", "swg-tests.ps1",
+                                        "build_release.py", "Dockerfile", ".dockerignore")]
     sources += sorted((root / "swg_test_studio").glob("*.py"))
     sources += sorted((root / "swg_test_studio/examples").glob("*.json"))
     sources += sorted((root / "tests").glob("*.py"))

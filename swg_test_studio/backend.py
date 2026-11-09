@@ -61,7 +61,7 @@ def plan(suite, env):
     bindings = {r: env["bindings"][r] for r in suite["roles"] if r in env["bindings"]}
     missing = [role for role in suite["roles"] if role not in bindings]
     if missing:
-        raise ValueError("Add a dedicated registry key for each missing role in Environment setup: " + ", ".join(missing))
+        raise ValueError("The test setup has no characters assigned for these parts: " + ", ".join(missing))
     manifest = compile_suite(suite, local_path(env["server_checkout"]) / "devtools/zones/test_sets")
     cases = manifest["tests"]
     action_kinds = {

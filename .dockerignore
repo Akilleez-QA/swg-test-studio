@@ -1,0 +1,14 @@
+**
+!README.md
+!pyproject.toml
+!swg-tests.py
+!swg-tests.ps1
+!build_release.py
+!Dockerfile
+!.dockerignore
+!swg_test_studio/
+!swg_test_studio/*.py
+!swg_test_studio/examples/
+!swg_test_studio/examples/*.json
+!tests/
+!tests/*.py

@@ -5,7 +5,6 @@ from pathlib import Path
 import sys
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from swg_test_studio.backend import environment, environment_template
 from swg_test_studio.collection import Collection, export_regression
 from swg_test_studio.gui import Studio
 from swg_test_studio.store import write_json
@@ -26,24 +25,23 @@ with tempfile.TemporaryDirectory() as workspace:
         assert app.status.get().startswith("Valid supported suite")
         app.tree.selection_set("example:ord_round_trip")
         app.open_selected()
-        form = app.configure_environment()
-        profile = environment_template()
-        for field, value in form.values.items():
-            value.set(profile[field])
-        form.values["server_checkout"].set(r"F:\SWGProjects\swg-server")
-        assert form.bindings[0][0].get() == "pilot"
-        form.bindings[0][1].set("tester")
-        target = Path(workspace) / "environment.json"
-        with patch("swg_test_studio.environment_ui.filedialog.asksaveasfilename", return_value=str(target)):
-            form.save()
-        loaded = environment(target)
-        assert loaded["server_checkout"] == "/mnt/f/SWGProjects/swg-server"
-        assert loaded["bindings"] == {"pilot": "tester"}
-        assert app.env() == str(target)
         calls = []
         app.job = lambda *args: calls.append(args)
+        with patch("swg_test_studio.gui.filedialog.askdirectory", return_value=r"F:\SWGProjects\swg-server\src"):
+            app.configure_environment()
+        assert calls[-1] == ("select-source", "--source", r"F:\SWGProjects\swg-server\src")
+        project = "swg-cold-test-01234567"
+        app.show_servers({"source": "/mnt/f/SWGProjects/swg-server", "servers": [
+            {"id": project, "name": "Local SWG test server", "state": "Stopped", "characters": 2}
+        ]})
         app.preview()
-        assert calls[-1] == ("plan", "ord_round_trip", "--environment", str(target))
+        assert calls[-1] == ("plan", "ord_round_trip", "--test-server", project)
+        app.keep_running.set(True)
+        app.run()
+        assert calls[-1] == ("run", "ord_round_trip", "--test-server", project, "--keep-running")
+        app.players.set("Two players")
+        app.start_recording()
+        assert calls[-1] == ("record-start", "--test-server", project, "--role", "leader", "--role", "member")
         with patch("swg_test_studio.gui.simpledialog.askstring", return_value="my_ord_trip"):
             app.copy_example()
         assert app.current()["id"] == "my_ord_trip"
@@ -75,6 +73,17 @@ with tempfile.TemporaryDirectory() as workspace:
         app.tree.selection_set("driver:driver_unit")
         app.open_selected()
         assert app.current() == manifest
+        assert app.tree.set("driver:driver_unit", "kind") == "Server test"
+        original = path.read_bytes()
+        app.toggle_removed()
+        assert not app.tree.exists("driver:driver_unit")
+        assert path.read_bytes() == original
+        app.show_removed.set(True)
+        app.refresh()
+        app.tree.selection_set("driver:driver_unit")
+        app.toggle_removed()
+        assert app.tree.set("driver:driver_unit", "kind") == "Server test"
+        app.show_removed.set(False)
         app.validate()
         assert "driver manifest structure" in app.status.get()
         copy = Path(workspace) / "my_regression.json"
@@ -94,7 +103,7 @@ with tempfile.TemporaryDirectory() as workspace:
         app.open_selected()
         assert app.current()["review"]["approved"]
         app.preview()
-        assert calls[-1] == ("plan", "my_login_test", "--environment", str(target))
+        assert calls[-1] == ("plan", "my_login_test", "--test-server", project)
         batch = Path(workspace) / "batch.json"
         with patch("swg_test_studio.gui.filedialog.asksaveasfilename", return_value=str(batch)):
             app.save_batch_template()
@@ -103,6 +112,6 @@ with tempfile.TemporaryDirectory() as workspace:
                 patch("swg_test_studio.gui.simpledialog.askinteger", return_value=2):
             app.submit_batch("plan-batch")
         assert calls[-1] == ("plan-batch", "--file", str(batch), "--jobs", "2")
-        print("GUI smoke passed: profile, examples, recording, collection editing and batch controls")
+        print("GUI smoke passed: source selection, Docker controls, recording, removal, collections and batch controls")
     finally:
         root.destroy()

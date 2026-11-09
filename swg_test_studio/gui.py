@@ -8,36 +8,36 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .backend import environment
+from .backend import local_path
 from .batch import MAX_JOBS, batch_template
 from .collection import FORMAT as COLLECTION_FORMAT, MAX_BYTES, Collection, is_driver_suite, validate_entry
-from .environment_ui import EnvironmentDialog
 from .model import loads, validate
+from .setup import saved_source
 from .store import Library, read_json, write_json
 
 
 EXAMPLE_DETAILS = {
     "login_relogin": "A good first test. Log in, log out, then log in again to verify the character saved. Use an existing dedicated character.",
-    "create_character": "Create a dedicated character and verify the first login, logout and save. Choose a registry key reserved for character creation.",
+    "create_character": "Create a test character and verify the first login, logout and save. The test server needs one unused character slot.",
     "driver_guards": "Run the server checkout's driver unit checks. The suite has no character roles and needs no running game services.",
     "gamma_shuttle": "Use the original shuttle terminal to travel from Tansaari to Gamma and back. Start at Tansaari with an actor prepared for shuttle travel.",
     "terminal_journey": "Replay both shuttle directions in one session. The fixture positions a solo Tansaari actor near the terminals.",
     "shuttle_recorded_cases": "Replay three reviewed clips covering cancellation and both travel directions. Use a solo actor in either supported station.",
     "ord_round_trip": "Replay a recorded launch from Tansaari to Ord Mantell and land in the authored hangar. Use a solo Tansaari pilot.",
-    "ord_group_sequence": "Form a group, change leaders, launch, land and disband. Bind two distinct dedicated actors who start solo at Tansaari.",
-    "ship_and_group": "Run the existing driver scenario for owned ships, landing and group routing. Bind two dedicated Tansaari actors.",
-    "group_disband": "Verify that former members travel independently and can join a new group. Use three actors in the reviewed Rryatt/Ord fixture.",
+    "ord_group_sequence": "Form a group, change leaders, launch, land and disband. Needs two test characters who start solo at Tansaari.",
+    "ship_and_group": "Check ship ownership, landing and group travel. Needs two test characters at Tansaari.",
+    "group_disband": "Verify that former members travel independently and can join a new group. Needs three test characters on a Rryatt/Ord test server.",
 }
 
 GETTING_STARTED = (
     "1. Open the selected login and relogin example in the Library. Click Validate to inspect it offline.\n\n"
-    "2. Use Copy example to make an editable test. The Library shows each example's roles and prerequisites.\n\n"
-    "3. Choose Set up environment to connect the test to your isolated fixture and dedicated characters. "
-    "Use the prepared fixture folder and matched driver executable from the SWG server setup. "
-    "The server checkout's docs/protocol-driver64.md explains how to prepare both.\n\n"
-    "4. Preview run shows the planned actions and setup. Start the matching test fixture before Run or Record.\n\n"
-    "5. In Record, enter the environment's role names, separated by commas when recording two characters. "
-    "Stop and export a draft, review its expectations, then save it for replay."
+    "2. Use Copy example to make an editable test. Each test shows how many players it needs.\n\n"
+    "3. Install and start Docker. Click Choose source folder and select your SWG source. "
+    "Studio finds prepared Docker test servers and chooses test characters automatically.\n\n"
+    "4. Preview run shows what the test will do. Run can start a stopped test server. "
+    "Check Keep test server running to keep it available after the test.\n\n"
+    "5. In Record, choose one or two players. After playing, stop and export a draft, "
+    "review its expectations, then save it for replay."
 )
 
 
@@ -49,12 +49,17 @@ class Studio:
         self.collection = None
         self.library_title = tk.StringVar(value="Examples and saved tests")
         self.filter_text = tk.StringVar()
-        self.environment = tk.StringVar()
-        self.environment_name = tk.StringVar(value="Set up an environment when you are ready to preview, run or record.")
+        self.source = tk.StringVar()
+        self.server = tk.StringVar()
+        self.server_choices = {}
+        self.keep_running = tk.BooleanVar(value=False)
+        self.operation_message = None
+        self.removed_path = self.library.workspace / "removed-tests.json"
+        self.show_removed = tk.BooleanVar(value=False)
         self.example_details = tk.StringVar()
         self.recording = tk.StringVar()
         self.capture_ranges = tk.StringVar()
-        self.role = tk.StringVar(value="actor")
+        self.players = tk.StringVar(value="One player")
         self.status = tk.StringVar(value="Open the selected starter example and click Validate to try Studio offline.")
         root.title("SWG Test Studio")
         root.geometry("1150x760")
@@ -66,15 +71,20 @@ class Studio:
         shell = ttk.Frame(root, padding=18)
         shell.pack(fill="both", expand=True)
         ttk.Label(shell, text="SWG Test Studio", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(shell, text="Record gameplay. Define expectations. Replay with the existing 64-bit driver.").pack(anchor="w", pady=(3, 14))
+        ttk.Label(shell, text="Create and record gameplay tests. Running tests uses Docker.").pack(anchor="w", pady=(3, 14))
         bar = ttk.Frame(shell)
         bar.pack(fill="x", pady=(0, 12))
-        ttk.Label(bar, text="Environment").pack(side="left")
-        ttk.Entry(bar, textvariable=self.environment, state="readonly").pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(bar, text="Open profile…", command=self.choose_environment).pack(side="left")
-        ttk.Button(bar, text="Set up environment…", command=self.configure_environment).pack(side="left", padx=5)
+        ttk.Label(bar, text="SWG source").pack(side="left")
+        ttk.Entry(bar, textvariable=self.source, state="readonly").pack(side="left", fill="x", expand=True, padx=8)
+        ttk.Button(bar, text="Choose source folder…", command=self.configure_environment).pack(side="left", padx=5)
         ttk.Button(bar, text="Help", command=self.help).pack(side="left")
-        ttk.Label(shell, textvariable=self.environment_name, wraplength=760).pack(anchor="w", pady=(0, 8))
+        bar = ttk.Frame(shell)
+        bar.pack(fill="x", pady=(0, 12))
+        ttk.Label(bar, text="Docker test server").pack(side="left")
+        self.server_menu = ttk.Combobox(bar, textvariable=self.server, state="readonly", width=56)
+        self.server_menu.pack(side="left", fill="x", expand=True, padx=8)
+        ttk.Button(bar, text="Find test servers", command=lambda: self.job("test-servers")).pack(side="left")
+        ttk.Checkbutton(bar, text="Keep test server running", variable=self.keep_running).pack(side="left", padx=8)
         self.tabs = ttk.Notebook(shell)
         self.tabs.pack(fill="both", expand=True)
         library = ttk.Frame(self.tabs, padding=10)
@@ -97,7 +107,7 @@ class Studio:
         listing = ttk.Frame(library)
         listing.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(listing, columns=("title", "kind", "roles"), show="headings")
-        for name, text, width in (("title", "Test", 650), ("kind", "Source", 90), ("roles", "Roles", 170)):
+        for name, text, width in (("title", "Test", 610), ("kind", "Test type", 135), ("roles", "Test characters", 150)):
             self.tree.heading(name, text=text)
             self.tree.column(name, width=width)
         scrollbar = ttk.Scrollbar(listing, orient="vertical", command=self.tree.yview)
@@ -118,6 +128,12 @@ class Studio:
         self.save_collection_button.pack(side="left", padx=6)
         self.close_collection_button = ttk.Button(actions, text="Close collection", command=self.close_collection)
         self.close_collection_button.pack(side="left")
+        removal = ttk.Frame(library)
+        removal.pack(fill="x")
+        self.remove_button = ttk.Button(removal, text="Remove from Studio", command=self.toggle_removed)
+        self.remove_button.pack(side="left")
+        ttk.Checkbutton(removal, text="Show removed tests", variable=self.show_removed,
+                        command=self.refresh).pack(side="left", padx=8)
         ttk.Label(editor, text="Edit the typed JSON below. Give example copies a new ID. Each session includes logout and full save checks.").pack(anchor="w")
         self.editor = tk.Text(editor, wrap="none", undo=True, font=("Consolas", 11))
         self.editor.pack(fill="both", expand=True, pady=8)
@@ -126,14 +142,14 @@ class Studio:
         for text, callback in (("Validate", self.validate), ("Approve reviewed expectations", self.approve), ("Save", self.save), ("Export test…", self.export_test), ("Preview run", self.preview), ("Run", self.run)):
             ttk.Button(row, text=text, command=callback).pack(side="left", padx=(0, 6))
         ttk.Label(recording, wraplength=760, text=(
-            "Set up an environment with a recording-enabled fixture, then enter the bound role names below. "
-            "Record supported shuttle trips, Ord launch and landing, or two-character group actions. "
-            "Stop, export a draft, and review its expectations. Log out and allow the character to unload before replay."
+            "Choose how many players to record. Studio assigns their test characters automatically. "
+            "Recording keeps the Docker test server running while you play. Stop and export a draft to review it."
         )).pack(anchor="w", pady=(0, 12))
         row = ttk.Frame(recording)
         row.pack(fill="x")
-        ttk.Label(row, text="Role names").pack(side="left")
-        ttk.Entry(row, textvariable=self.role, width=18).pack(side="left", padx=6)
+        ttk.Label(row, text="Players to record").pack(side="left")
+        ttk.Combobox(row, textvariable=self.players, values=("One player", "Two players"),
+                     state="readonly", width=18).pack(side="left", padx=6)
         ttk.Button(row, text="Start recording", command=self.start_recording).pack(side="left")
         row = ttk.Frame(recording)
         row.pack(fill="x", pady=10)
@@ -154,7 +170,8 @@ class Studio:
         batch_actions.pack(fill="x", pady=(6, 0))
         for text, action in (("Save batch template…", self.save_batch_template),
                              ("Preview batch…", lambda: self.submit_batch("plan-batch")),
-                             ("Run batch…", lambda: self.submit_batch("run-batch"))):
+                             ("Run batch…", lambda: self.submit_batch("run-batch")),
+                             ("Check Studio in Docker", lambda: self.job("docker-check"))):
             ttk.Button(batch_actions, text=text, command=action).pack(side="left", padx=(0, 6))
         ttk.Label(results, wraplength=900, text=(
             "Batch jobs use the selected collection or workspace library. Each job names its own environment profile. "
@@ -167,12 +184,13 @@ class Studio:
         self.refresh()
         if collection:
             self.guarded(lambda: self.open_collection(collection))
-        default = self.library.workspace / "environment.json"
-        if default.is_file():
-            try:
-                self.use_environment(default, environment(default))
-            except (ValueError, OSError) as exc:
-                self.status.set(f"Open or set up an environment. The saved profile could not load ({exc}).")
+        try:
+            source = saved_source(self.library.workspace)
+            if source:
+                self.source.set(str(local_path(source)))
+                self.job("test-servers")
+        except (ValueError, OSError):
+            self.status.set("Choose the SWG source folder again to update the saved selection.")
         root.after(100, self.poll)
 
     def guarded(self, callback):
@@ -192,15 +210,21 @@ class Studio:
             else:
                 rows = self.library.list(on_invalid_saved_test=lambda path, exc: invalid.append(path.name))
             needle = self.filter_text.get().strip().casefold()
+            removed = self.removed_tests().get(self.removal_scope(), [])
             self.tree.delete(*self.tree.get_children())
             self.library_rows = {}
             for row in rows:
                 if needle and needle not in (row["id"] + " " + row["title"]).casefold():
                     continue
                 item = row["origin"] + ":" + row["id"]
+                if item in removed and not self.show_removed.get():
+                    continue
                 self.library_rows[item] = row
-                origin = {"example": "Example", "user": "My test", "studio": "Studio", "driver": "Driver"}[row["origin"]]
-                self.tree.insert("", "end", iid=item, values=(row["title"], origin, ", ".join(row["roles"]) or "None"))
+                origin = {"example": "Example", "user": "Studio test", "studio": "Studio test",
+                          "driver": "Server test"}[row["origin"]]
+                if item in removed:
+                    origin += " (removed)"
+                self.tree.insert("", "end", iid=item, values=(row["title"], origin, len(row["roles"])))
             starter = "studio:login_relogin" if self.collection else "example:login_relogin"
             item = selected[0] if selected and self.tree.exists(selected[0]) else starter
             if not self.tree.exists(item) and self.library_rows:
@@ -225,13 +249,19 @@ class Studio:
         row = self.selected_row()
         example = row and row["origin"] == "example"
         self.copy_button.configure(state="normal" if example else "disabled")
+        removed = self.removed_tests().get(self.removal_scope(), [])
+        self.remove_button.configure(state="normal" if row else "disabled",
+                                     text="Restore to Studio" if self.tree.selection() and
+                                     self.tree.selection()[0] in removed else "Remove from Studio")
         if row:
             if row["origin"] == "driver":
-                notes = "Open to inspect, edit, or export this driver manifest. Use the original server harness and its required fixture to run an authorized case."
+                notes = "This test runs with the SWG server’s existing test tools. You can open or export it here."
             else:
                 notes = EXAMPLE_DETAILS.get(row["id"], "Open this test to inspect its steps and expected results.")
-            roles = ", ".join(row["roles"]) or "None"
-            self.example_details.set(f"{notes}\nRoles for this test: {roles}")
+            roles = ", ".join(row["roles"])
+            explanation = (f"\nThe test calls its players {roles}. These names describe their parts in the test. "
+                           "Studio assigns the actual test characters automatically." if roles and row["origin"] != "driver" else "")
+            self.example_details.set(notes + explanation)
         else:
             self.example_details.set("Select a test to see what it checks and which roles it needs.")
 
@@ -255,6 +285,33 @@ class Studio:
 
     def help(self):
         messagebox.showinfo("Getting started with SWG Test Studio", GETTING_STARTED, parent=self.root)
+
+    def removal_scope(self):
+        return str(self.collection.path) if self.collection else "workspace"
+
+    def removed_tests(self):
+        return read_json(self.removed_path) if self.removed_path.is_file() else {}
+
+    def toggle_removed(self):
+        def action():
+            selection = self.tree.selection()
+            if not selection:
+                return
+            item = selection[0]
+            removed = self.removed_tests()
+            scope = self.removal_scope()
+            items = removed.setdefault(scope, [])
+            if item in items:
+                items.remove(item)
+                self.status.set("Test restored to Studio.")
+            else:
+                items.append(item)
+                self.status.set("Test removed from Studio. Turn on Show removed tests to restore it.")
+            if not items:
+                removed.pop(scope)
+            write_json(self.removed_path, removed, replace=True)
+            self.refresh()
+        self.guarded(action)
 
     def set_editor(self, value):
         self.editor.delete("1.0", "end")
@@ -371,32 +428,34 @@ class Studio:
                 self.status.set("Exported " + path)
         self.guarded(action)
 
-    def choose_environment(self):
-        path = filedialog.askopenfilename(parent=self.root, filetypes=[("Environment JSON", "*.json")])
-        if path:
-            self.guarded(lambda: self.use_environment(Path(path), environment(path)))
-
-    def use_environment(self, path, data):
-        self.environment.set(str(path))
-        self.environment_name.set("Selected profile: " + data["name"])
-        self.status.set("Environment selected. Preview a test to check its role bindings.")
-
     def configure_environment(self):
-        def action():
-            row = self.selected_row()
-            roles = row["roles"] if row else ()
-            if self.tabs.index(self.tabs.select()) == 1 and self.editor.get("1.0", "end").strip():
-                try:
-                    roles = self.current()["roles"]
-                except ValueError:
-                    pass
-            path = Path(self.env()) if self.env() else None
-            return EnvironmentDialog(self.root, self.library.workspace, self.use_environment, path=path,
-                                     data=environment(path) if path else None, roles=roles)
-        return self.guarded(action)
+        path = filedialog.askdirectory(parent=self.root, title="Choose the SWG source folder",
+                                      initialdir=self.source.get() or None)
+        if path:
+            self.job("select-source", "--source", path)
 
-    def env(self):
-        return self.environment.get()
+    def server_argument(self):
+        if not self.source.get():
+            raise ValueError("Choose the SWG source folder first.")
+        project = self.server_choices.get(self.server.get())
+        if not project:
+            raise ValueError("Click Find test servers, then choose a Docker test server.")
+        return ("--test-server", project)
+
+    def show_servers(self, result):
+        source = result.get("source")
+        previous = self.server_choices.get(self.server.get()) if not source else None
+        if source:
+            self.source.set(str(local_path(source)))
+        self.server_choices = {}
+        for row in result["servers"]:
+            label = f"{row['name']} [{row['id']}] • {row['state']} • {row['characters']} prepared players"
+            self.server_choices[label] = row["id"]
+        choices = list(self.server_choices)
+        self.server_menu.configure(values=choices)
+        selection = next((label for label in choices if self.server_choices[label] == previous), "")
+        self.server.set(selection or (choices[0] if choices else ""))
+        self.operation_message = result.get("message") or "Choose a test, then Preview run or Run."
 
     def preview(self):
         self.guarded(lambda: self.submit_suite("plan"))
@@ -407,8 +466,7 @@ class Studio:
     def submit_suite(self, command):
         suite = self.studio_suite()
         validate(suite, runnable=True)
-        if not self.env():
-            raise ValueError("Choose Set up environment to create a profile, or Open profile to use an existing one.")
+        server = self.server_argument()
         try:
             existing = (self.collection or self.library).get(suite["id"])
         except ValueError:
@@ -416,15 +474,14 @@ class Studio:
         if existing != suite:
             raise ValueError("Save your test before previewing or running it")
         self.tabs.select(3)
-        self.job(command, suite["id"], "--environment", self.env())
+        keep = ("--keep-running",) if command == "run" and self.keep_running.get() else ()
+        self.job(command, suite["id"], *server, *keep)
 
     def start_recording(self):
         def action():
-            if not self.env():
-                raise ValueError("Choose Set up environment before recording.")
-            arguments = ["record-start", "--environment", self.env()]
-            for role in self.role.get().split(","):
-                arguments.extend(("--role", role.strip()))
+            arguments = ["record-start", *self.server_argument()]
+            for role in ("actor",) if self.players.get() == "One player" else ("leader", "member"):
+                arguments.extend(("--role", role))
             self.job(*arguments)
         self.guarded(action)
 
@@ -455,6 +512,7 @@ class Studio:
         if self.process is not None:
             self.status.set("An operation is already running")
             return
+        self.operation_message = None
         launcher = Path(__file__).with_name("entry.py")
         argv = [sys.executable, str(launcher), "--workspace", str(self.library.workspace), *args]
         if self.collection and args[0] in ("plan", "run", "plan-batch", "run-batch"):
@@ -477,7 +535,8 @@ class Studio:
             item = self.messages.get()
             if isinstance(item, dict):
                 self.process = None
-                self.status.set("Operation completed" if item["finished"] == 0 else "Operation failed — see Results")
+                self.status.set(self.operation_message or ("Operation completed" if item["finished"] == 0 else
+                                                            "Operation failed — see Results"))
                 continue
             self.output.configure(state="normal")
             self.output.insert("end", item)
@@ -485,6 +544,10 @@ class Studio:
             self.output.configure(state="disabled")
             try:
                 value = json.loads(item)
+                if value.get("event") == "test_servers":
+                    self.show_servers(value)
+                if value.get("event") == "error":
+                    self.operation_message = value["error"].removeprefix("ValueError: ")
                 if value.get("state") == "armed_waiting_for_server_events":
                     self.capture_ranges.set("")
                 if "id" in value and len(str(value["id"])) == 32:
