@@ -4,11 +4,16 @@ import re
 
 from .backend import driver_modules, environment, validate_environment
 from .model import exact
-from .server_tools import source_folder
+from .server_tools import load_tool, profile_of, source_folder
 from .store import read_json, write_json
 
 
 SETUPS = Path("StarWarsGalaxies/logs/studio-setups")
+
+
+def setups_folder(profile):
+    """Registered setups live in the profile's own deployment folder of the checkout."""
+    return Path(profile.deployment) / "logs/studio-setups"
 PROJECT = re.compile(r"swg-cold-test-[a-f0-9]{8}\Z")
 
 
@@ -73,7 +78,7 @@ def register_setup(path, *, replace=False):
     source = source_folder(env["server_checkout"])
     env = dict(env, server_checkout=str(source))
     _, _, root, _, _, _, _ = checked_setup(env)
-    destination = source / SETUPS / (root.name + ".json")
+    destination = source / setups_folder(profile_of(env)) / (root.name + ".json")
     write_json(destination, env, replace=replace)
     return destination
 
@@ -84,11 +89,15 @@ def available_setups(workspace, *, source=None):
         raise ValueError("Choose the SWG source folder first.")
     source = source_folder(saved)
     registered = {}
-    for path in sorted((source / SETUPS).glob("swg-cold-test-*.json")):
-        env = environment(path)
-        if (PROJECT.fullmatch(path.stem) and Path(env["server_checkout"]).resolve() == source and
-                Path(env["folder"]).parent.name == path.stem):
-            registered[path.stem] = env
+    profiles = load_tool("zones/server_profile.py").PROFILES.values()
+    for folder in dict.fromkeys(setups_folder(profile) for profile in profiles):
+        for path in sorted((source / folder).glob("swg-cold-test-*.json")):
+            env = environment(path)
+            # A setup counts only in the folder its own profile registers into.
+            if (PROJECT.fullmatch(path.stem) and Path(env["server_checkout"]).resolve() == source and
+                    Path(env["folder"]).parent.name == path.stem and
+                    setups_folder(profile_of(env)) == folder and path.stem not in registered):
+                registered[path.stem] = env
     if not registered:
         legacy = Path(workspace) / "environment.json"
         if legacy.is_file():

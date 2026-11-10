@@ -272,10 +272,12 @@ RUNTIME_SCRIPTS = "/opt/whitengold/data/sku.0/sys.server/compiled/game/script"
 RELEASE = {52: "8", 55: "11", 61: "17", 65: "21"}
 
 
-def reload_command(worker):
+def reload_command(worker, script=SCRIPT):
     if type(worker) is not int or not 0 < worker <= 2147483647:
         raise ValueError("Invalid game server id")
-    return f"game {worker} reloadScript {SCRIPT}"
+    if not re.fullmatch(r"fixture\.[a-z_]{1,32}", script):
+        raise ValueError("Only fixture scripts are reloaded")
+    return f"game {worker} reloadScript {script}"
 
 
 def class_release(path):
@@ -290,9 +292,9 @@ def class_release(path):
     return RELEASE[major]
 
 
-def fixture_workers(project, run):
+def fixture_workers(project, run, runtime_log="/opt/whitengold/exe/linux/runtime.log"):
     """Game server ids the fixture's central server has registered (same source as the bot query)."""
-    log = run(["docker", "exec", project + "-central-1", "cat", "/opt/whitengold/exe/linux/runtime.log"])
+    log = run(["docker", "exec", project + "-central-1", "cat", runtime_log])
     workers = sorted({int(n) for n in re.findall(r"Adding server ([0-9]+) for scene \w+", log)})
     if not workers or len(workers) > 64:
         raise RuntimeError("Cannot bound current fixture game servers")
@@ -312,7 +314,7 @@ def install(env, emit=print):
     import tempfile
     from pathlib import Path
     from .backend import driver_modules
-    from .server_tools import verified_tool_root
+    from .server_tools import profile_of, verified_tool_root
 
     def run(argv, **kw):
         return subprocess.run(argv, capture_output=True, text=True, check=True, **kw).stdout
@@ -322,22 +324,31 @@ def install(env, emit=print):
     project, schema, services = driver.fixture(folder)
     if not re.fullmatch(r"WGC_[A-F0-9]{12}", schema or ""):
         raise ValueError("The agent fixture installs only into an isolated copied-schema fixture")
-    source = verified_tool_root() / "zones/fixtures/agent_fixture.java"
+    profile = profile_of(env)
+    # The profile's fixtures; the lean bot fixture first, so it never references a newer helper.
+    sources = [verified_tool_root() / "zones" / name for name in profile.fixtures]
+    scripts = profile.runtime_scripts
     game = services["game"]["Id"]
     with tempfile.TemporaryDirectory(prefix="swg-agent-fixture-") as tmp:
         tmp = Path(tmp)
-        run(["docker", "cp", f"{game}:{RUNTIME_SCRIPTS}/.", str(tmp / "classpath" / "script")])
+        run(["docker", "cp", f"{game}:{scripts}/.", str(tmp / "classpath" / "script")])
         release = class_release(tmp / "classpath" / "script" / "base_script.class")
         out = tmp / "out"
-        run(["javac", "--release", release, "-encoding", "utf8", "-nowarn", "-implicit:none",
-             "-cp", str(tmp / "classpath"), "-d", str(out), str(source)])
-        built = out / "script" / "fixture" / "agent_fixture.class"
         target = folder / "fixture" / "classes" / "script" / "fixture"
         target.mkdir(parents=True, exist_ok=True, mode=0o755)
-        shutil.copy2(built, target / "agent_fixture.class")
-        run(["docker", "cp", str(built), f"{game}:{RUNTIME_SCRIPTS}/fixture/agent_fixture.class"])
+        for source in sources:
+            run(["javac", "--release", release, "-encoding", "utf8", "-nowarn", "-implicit:none",
+                 "-cp", str(tmp / "classpath"), "-d", str(out), str(source)])
+            built = out / "script" / "fixture" / (source.stem + ".class")
+            shutil.copy2(built, target / built.name)
+            run(["docker", "cp", str(built), f"{game}:{scripts}/fixture/{built.name}"])
     host = central_host(project, lambda name: json.loads(run(["docker", "inspect", name])))
-    replies = {w: send(host, reload_command(w)).strip()[:200] for w in fixture_workers(project, run)}
+    workers = fixture_workers(project, run, profile.runtime_log)
+    replies = {w: send(host, reload_command(w)).strip()[:200] for w in workers}
+    for source in sources:
+        if source.stem != "agent_fixture":
+            for w in workers:
+                replies[f"{w}:{source.stem}"] = send(host, reload_command(w, "fixture." + source.stem)).strip()[:200]
     emit({"event": "agent_fixture_installed", "release": release, "class": str(target / "agent_fixture.class"),
           "reloads": replies})
     return replies

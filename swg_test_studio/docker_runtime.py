@@ -12,7 +12,7 @@ import tempfile
 import time
 
 from .setup import available_setups, checked_setup
-from .server_tools import tool_environment, verified_tool_root
+from .server_tools import profile_of, tool_environment, verified_tool_root
 from .store import read_json
 
 REUSE_ROLES = ("chat", "local_chat", "game")
@@ -45,7 +45,7 @@ def require_docker():
 
 def container_set(env, *, during_start=False):
     driver, folder, root, volume, schema, stage, roster = checked_setup(env)
-    release = read_json(Path(env["server_checkout"]) / "StarWarsGalaxies/instance-release.json")
+    release = read_json(Path(env["server_checkout"]) / profile_of(env).deployment / "instance-release.json")
     pins = release["roles"]
     expected = set(pins) | {"oracle", "local_chat"}
     rows = {}
@@ -217,6 +217,33 @@ def wait_for_login_hosts(driver, folder, central, bindings):
     raise ValueError("Login is ready, but the test characters’ saved worlds did not finish loading.")
 
 
+def registered_scenes(log):
+    """Scenes for which Central has registered a game server."""
+    return set(re.findall(r"Adding server [0-9]+ for scene (\w+)", log))
+
+
+def wait_for_scene_workers(driver, folder, central, bindings, profile, *, timeout=180, sleep=time.sleep):
+    """Readiness without a capacity console: a game server is registered for every saved scene.
+
+    The fixture checks in driver.fixture and the login readiness line still apply first.
+    """
+    project, schema, _ = driver.fixture(folder)
+    scenes = set()
+    for key in bindings.values():
+        path = folder / "protocol-driver" / (key + ".json")
+        bot = driver.identity(read_json(path)) if path.is_file() else {}
+        if bot.get("player"):
+            scenes.add(driver.saved(project, schema, bot["player"])["scene"])
+    deadline = time.monotonic() + timeout
+    while True:
+        registered = registered_scenes(docker("exec", central, "cat", profile.runtime_log, timeout=15))
+        if registered and scenes <= registered:
+            return
+        if time.monotonic() >= deadline:
+            raise ValueError("Login is ready, but no game server registered the test characters’ saved scenes.")
+        sleep(3)
+
+
 def plain_login(suite):
     return all(step["action"] == "session" and set(step["options"]) == {"role"} for step in suite["steps"])
 
@@ -305,7 +332,16 @@ def finish_incomplete_shutdown(rows):
 def active_server(env, *, keep_running, emit, login_only=False):
     require_docker()
     driver, folder, _, _, _, _ = container_set(env)
-    lock = driver.REPO / "StarWarsGalaxies"
+    profile = profile_of(env)
+    lock = driver.REPO / profile.deployment
+
+    def wait_ready(rows):
+        if not profile.capacity_console:
+            wait_for_scene_workers(driver, folder, rows["central"]["Id"], env["bindings"], profile)
+        elif login_only:
+            wait_for_login_hosts(driver, folder, rows["central"]["Id"], env["bindings"])
+        else:
+            wait_for_preload(driver, folder)
     started = []
     with driver.operation_lock(lock):
         _, _, rows, state, stage, _ = container_set(env)
@@ -320,16 +356,14 @@ def active_server(env, *, keep_running, emit, login_only=False):
         if state == "Stopped":
             try:
                 emit({"event": "test_server", "state": "Preparing", "project": project})
-                prepare_restart(driver, folder, rows, stage)
+                if profile.restart_journals:
+                    prepare_restart(driver, folder, rows, stage)
                 started = [role for role in rows if role != "oracle"]
                 rows = recreate_games(env, folder, rows)
                 emit({"event": "test_server", "state": "Loading", "project": project})
                 wait_for_login(rows, project)
                 driver.fixture(folder)
-                if login_only:
-                    wait_for_login_hosts(driver, folder, rows["central"]["Id"], env["bindings"])
-                else:
-                    wait_for_preload(driver, folder)
+                wait_ready(rows)
                 emit({"event": "test_server", "state": "Ready", "project": project})
             except BaseException:
                 if started:
@@ -338,8 +372,8 @@ def active_server(env, *, keep_running, emit, login_only=False):
                 raise
         else:
             driver.fixture(folder)
-            if login_only:
-                wait_for_login_hosts(driver, folder, rows["central"]["Id"], env["bindings"])
+            if login_only or not profile.capacity_console:
+                wait_ready(rows)
     try:
         yield
     finally:

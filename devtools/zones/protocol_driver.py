@@ -24,6 +24,7 @@ from disposable_database import validate
 from instance_schema_upgrade import sql_script
 from prepare_stage5_client_fixture64 import inspect_project
 from studio_tool_bundle import TOOLS_ROOT
+import server_profile
 sys.path.insert(0, str(TOOLS_ROOT / 'manage'))
 from service import operation_lock
 
@@ -84,7 +85,7 @@ def fixture(folder, allow_stopped_role=None):
         raise ValueError('Matching verified Stage 5 schema required')
     services = {r['Config']['Labels']['com.docker.compose.service']: r for r in inspect_project(root.name)}
     validate(services['oracle'], root, volume)
-    release = json.loads((REPO / 'StarWarsGalaxies/instance-release.json').read_text())
+    release = json.loads((REPO / server_profile.active().deployment / 'instance-release.json').read_text())
     for role, pin in release['roles'].items():
         row = services[role]
         stopped_fault_role = (allow_stopped_role in ('taskmanager','game','planet') and role == allow_stopped_role and
@@ -109,29 +110,59 @@ def sql(project, schema, select):
     return [json.loads(s) for s in result.stdout.splitlines() if s.startswith('{')]
 
 
+def saved_query(schema, player, zone_instances=True):
+    if not re.fullmatch(r'WGC_[A-F0-9]{12}', schema) or not re.fullmatch(r'[1-9][0-9]{0,18}', player):
+        raise ValueError('Invalid fixture schema or character ID')
+    # Trees without zone instances have no objects.zone_instance_id column.
+    instance = 'to_char(zone_instance_id)' if zone_instances else "'" + server_profile.NO_INSTANCE + "'"
+    return f"""select json_object('id' value to_char(object_id),
+      'scene' value scene_id,'instance' value {instance},
+      'x' value x,'y' value y,'z' value z,'container' value to_char(contained_by),
+      'deleted' value deleted) from {schema}.objects where object_id={player};"""
+
+
 def saved(project, schema, player):
     if not re.fullmatch(r'[1-9][0-9]{0,18}', player):
         raise ValueError('Invalid created character ID')
-    rows = sql(project, schema, f"""select json_object('id' value to_char(object_id),
-      'scene' value scene_id,'instance' value to_char(zone_instance_id),
-      'x' value x,'y' value y,'z' value z,'container' value to_char(contained_by),
-      'deleted' value deleted) from {schema}.objects where object_id={player};""")
+    rows = sql(project, schema, saved_query(schema, player, server_profile.active().zone_instances))
     if len(rows) != 1 or rows[0]['deleted'] != 0:
         raise RuntimeError('Created character has no unique live saved object')
     return rows[0]
 
 
+def fixture_workers(log, zone_instances=True):
+    """Game server ids Central registered; with zone instances only canonical definitions count."""
+    found = re.findall(r'Adding server ([0-9]+) for scene (\w+)', log)
+    if zone_instances:
+        from instance_scope import load as family_scope
+        definitions={row['definition'] for row in family_scope()['definitions']}
+        found = [m for m in found if m[1] in definitions]
+    return sorted({int(m[0]) for m in found})
+
+
+def console_text(project, bot, command, worker, profile):
+    """One typed fixture console request for this bot on one game server."""
+    if profile.bot_console == 'binary':
+        return run(['docker', 'exec', project + '-central-1', '/fixture/protocol-bot-console', '127.0.0.1',
+                    command, str(worker), bot['player'], bot['station'], bot['character']], timeout=12)
+    import restoration_console
+    line = restoration_console.line(command, worker, bot)
+    host = restoration_console.central_address(json.loads(run(['docker', 'inspect', project + '-central-1'])))
+    try:
+        return restoration_console.request(host, line, timeout=12)
+    except OSError as exc:
+        raise RuntimeError('Fixture console request failed') from exc
+
+
 def bot_query(project, bot, command='botInspect', *, worker=None, _rescan=True):
+    profile = server_profile.active()
     if worker is not None:
         if command!='botInspect' or type(worker) is not int or not 0<worker<=2147483647:
             raise ValueError('A worker hint is restricted to bounded read-only inspection')
         workers=[worker]
     else:
-        log = run(['docker', 'exec', project + '-central-1', 'cat', '/opt/whitengold/exe/linux/runtime.log'])
-        from instance_scope import load as family_scope
-        definitions={row['definition'] for row in family_scope()['definitions']}
-        workers = sorted({int(m[0]) for m in re.findall(r'Adding server ([0-9]+) for scene (\w+)', log)
-                          if m[1] in definitions})
+        log = run(['docker', 'exec', project + '-central-1', 'cat', profile.runtime_log])
+        workers = fixture_workers(log, profile.zone_instances)
         if not workers or len(workers) > 64:
             raise RuntimeError('Cannot bound current fixture workers')
     if command != 'botInspect':
@@ -142,13 +173,11 @@ def bot_query(project, bot, command='botInspect', *, worker=None, _rescan=True):
     found = []
     inspected = 0
     for candidate_worker in workers:
-        argv = ['docker', 'exec', project + '-central-1', '/fixture/protocol-bot-console', '127.0.0.1',
-                command, str(candidate_worker), bot['player'], bot['station'], bot['character']]
         # Retry observations only. Replaying a timed-out setup could perform
         # the mutation twice; it must instead fail with its evidence intact.
         for attempt in range(3 if command == 'botInspect' else 1):
             try:
-                text = run(argv, timeout=12)
+                text = console_text(project, bot, command, candidate_worker, profile)
                 break
             except (RuntimeError, subprocess.TimeoutExpired):
                 if command != 'botInspect' or attempt == 2:
@@ -224,7 +253,7 @@ class Session:
         self.error = None
         self.log = evidence.open('x')
         self.process = subprocess.Popen(['docker', 'exec', '-i', '-e',
-            'LD_LIBRARY_PATH=/opt/whitengold/lib:/opt/whitengold/jvm/lib/server:/opt/whitengold/jvm/lib',
+            'LD_LIBRARY_PATH=' + server_profile.active().library_path,
             project + '-game-1', binary, config], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.thread = threading.Thread(target=self.read, daemon=True)
@@ -410,12 +439,19 @@ def main():
         parser.error('Explicit terminal requests require an exact --prompt')
     if not 0 <= args.menu_type <= 65535:
         parser.error('Invalid menu type')
+    profile = server_profile.active()
+    if profile.session_options is not None:
+        refused = sorted(key for key in ('clone_scene', 'terminal', 'stage_station', 'prepare_terminal',
+                                         'position_terminal_only', 'prompt', 'expect_family',
+                                         'require_hosted_public_instance') if getattr(args, key))
+        if refused:
+            parser.error('The ' + profile.name + ' server profile does not support: ' + ', '.join(refused))
     try:
         binary, build = validate_binary(args.binary)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     os.umask(0o077)
-    with operation_lock(REPO / 'StarWarsGalaxies'):
+    with operation_lock(REPO / profile.deployment):
         project, schema, services = fixture(args.folder)
         hosted_worlds = None
         if args.require_hosted_public_instance:

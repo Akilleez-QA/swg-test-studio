@@ -30,7 +30,10 @@ def start(env, workspace, role, seconds=600):
             len(set(roles)) != len(roles) or type(seconds) is not int or not 30 <= seconds <= 3600):
         raise ValueError("Select one or two distinct bound roles and duration of 30–3600 seconds")
     driver, _ = driver_modules(env)
-    with studio_lock(workspace), driver.operation_lock(driver.REPO / "StarWarsGalaxies"):
+    from .server_tools import profile_of
+    if not profile_of(env).recording:
+        raise ValueError("Recording needs the Test Studio recorder, which this server profile does not have.")
+    with studio_lock(workspace), driver.operation_lock(driver.REPO / profile_of(env).deployment):
         project, schema, services = driver.fixture(Path(env["folder"]))
         root = root_for(env)
         mount = next((m for m in services["game"]["Mounts"] if m["Destination"] == "/fixture"), None)

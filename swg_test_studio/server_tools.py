@@ -47,5 +47,14 @@ def load_tool(relative):
     return module
 
 
+def server_profile(name=None):
+    """A server profile by name (None: the default) from the verified bundled tool."""
+    return load_tool("zones/server_profile.py").get(name)
+
+
+def profile_of(env):
+    return server_profile(env.get("profile"))
+
+
 def tool_environment(source):
-    return dict(os.environ, **{SOURCE_ROOT_ENV: str(source)})
+    return load_tool("zones/server_profile.py").child_environment(dict(os.environ, **{SOURCE_ROOT_ENV: str(source)}))

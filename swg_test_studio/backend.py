@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 
 from .model import compile_suite, exact, ROLE
 from .agent_fixture import OPS as AGENT_OPS
-from .server_tools import load_tool, source_folder, tool_environment, verified_tool_root
+from .server_tools import load_tool, profile_of, source_folder, tool_environment, verified_tool_root
 from .store import read_json, write_json
 
 
@@ -33,7 +33,13 @@ def environment(path):
 
 
 def validate_environment(data):
-    exact(data, ("schema_version", "name", "server_checkout", "folder", "binary", "bindings"), "environment")
+    # "profile" is optional; without it the environment is the original whitengold one.
+    optional = ("profile",) if isinstance(data, dict) and "profile" in data else ()
+    exact(data, ("schema_version", "name", "server_checkout", "folder", "binary", "bindings") + optional, "environment")
+    if optional:
+        if not isinstance(data["profile"], str):
+            raise ValueError("Unknown server profile")
+        profile_of(data)
     if type(data["schema_version"]) is not int or data["schema_version"] != 1:
         raise ValueError("Unsupported environment version")
     if not isinstance(data["name"], str) or not 1 <= len(data["name"]) <= 100:
@@ -66,6 +72,8 @@ def plan(suite, env):
         raise ValueError("The test setup has no characters assigned for these parts: " + ", ".join(missing))
     manifest = compile_suite(suite, verified_tool_root() / "zones/test_sets")
     cases = manifest["tests"]
+    profile = profile_of(env)
+    load_tool("zones/server_profile.py").require_supported(cases, profile)
     action_kinds = {
         action["kind"]
         for case in cases if case["kind"] == "studio_action_sequence"
@@ -78,6 +86,7 @@ def plan(suite, env):
         for case in cases if case["kind"] != "driver_unit"
     )
     return {"schema_version": 1, "suite": suite["id"], "environment": env["name"],
+            **({} if profile.case_kinds is None else {"profile": profile.name}),
             "bindings": bindings, "manifest": manifest,
             "effects": {"gameplay_actions": bool(bindings), "creates_dedicated_character": any(
                 case["kind"] == "protocol_session" and case["options"].get("create", False) for case in cases),
@@ -90,10 +99,18 @@ def plan(suite, env):
                 "service_restart": False, "client_changed": False}}
 
 
+def require_profile_support(suite, profile):
+    """Refuse a suite the named server profile cannot run, before anything is started."""
+    tools = load_tool("zones/server_profile.py")
+    manifest = compile_suite(suite, verified_tool_root() / "zones/test_sets")
+    tools.require_supported(manifest["tests"], tools.get(profile))
+
+
 def driver_modules(env):
     if sys.platform != "linux":
         raise ValueError("Live operations require Linux/WSL; use the Windows launcher to relay them")
     source = source_folder(env["server_checkout"])
+    load_tool("zones/server_profile.py").bind(env.get("profile"))
     load_tool("zones/studio_tool_bundle.py").bind_server_source(source)
     return load_tool("zones/protocol_driver.py"), load_tool("zones/protocol_test_sets.py")
 

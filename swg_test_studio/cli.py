@@ -53,6 +53,8 @@ def main(argv=None):
     for action in ("show", "validate"):
         child = commands.add_parser(action)
         child.add_argument("suite")
+        if action == "validate":
+            child.add_argument("--profile", help="Also check that this server profile can run the test")
     child = commands.add_parser("save", help="Validate and save a user-defined JSON suite")
     child.add_argument("--file", type=Path, required=True)
     child.add_argument("--replace", action="store_true")
@@ -134,7 +136,12 @@ def main(argv=None):
                       "studio_replay": False})
             else:
                 validate(suite, runnable=True)
-                emit({"valid": True, "suite": args.suite})
+                if args.profile:
+                    from .backend import require_profile_support
+                    require_profile_support(suite, args.profile)
+                    emit({"valid": True, "suite": args.suite, "profile": args.profile})
+                else:
+                    emit({"valid": True, "suite": args.suite})
         elif args.command == "save":
             emit({"saved": str(library.save(read_json(args.file), replace=args.replace))})
         elif args.command == "export-regression":

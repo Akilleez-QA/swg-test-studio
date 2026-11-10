@@ -19,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 from prepare_client_fixture_schema import REPO
 from studio_tool_bundle import zone_tool_hashes
+import server_profile
 
 SETS = Path(__file__).with_name('test_sets')
 OPTIONS = {'create': bool, 'disconnect': bool, 'prepare_terminal': bool, 'position_terminal_only': bool, 'stage_station': bool,
@@ -27,7 +28,20 @@ OPTIONS = {'create': bool, 'disconnect': bool, 'prepare_terminal': bool, 'positi
            'terminal': str, 'prompt': str, 'menu_type': int, 'clone_scene': str}
 
 
+def profile_source_hashes(profile, repo):
+    """Hash a profile's own server inputs; a missing file is recorded, never raised."""
+    source = {}
+    for name in sorted(set(profile.source_inputs) | set(profile.absent_inputs)):
+        path = repo / name
+        source['../../' + name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else 'absent'
+    source.update(zone_tool_hashes())
+    return source
+
+
 def source_hashes():
+    profile = server_profile.active()
+    if profile.source_inputs is not None:
+        return profile_source_hashes(profile, REPO)
     from protocol_native_gates import GATES
     root = Path(__file__).parent
     studio_sources = ('retained_peer.py','recording_fixture.py','test_retained_peer.py','test_recording_fixture.py',
@@ -509,7 +523,7 @@ def main():
     elif args.folder:
         output = args.folder.resolve() / 'test-sets' / operation
     else:
-        output = REPO / 'StarWarsGalaxies/logs/protocol-test-sets' / operation
+        output = REPO / server_profile.active().deployment / 'logs/protocol-test-sets' / operation
     output.mkdir(parents=True, exist_ok=False, mode=0o700)
     (output / 'suite.json').write_text(json.dumps(data, indent=2) + '\n')
     report = {'schema_version': 1, 'suite': data['id'], 'operation': operation,
