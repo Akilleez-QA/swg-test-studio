@@ -193,6 +193,10 @@ bundled file's SHA-256. The fixture contracts retain the upstream producer
 hashes for the modules adapted to separate tool and server paths. Run reports
 record the actual bundled bytes alongside the server source evidence.
 
+An environment file may name a server profile (`"profile": "restoration"`) to drive a
+server built from a tree without zone instances; the default is `whitengold`. See
+`docs/restoration-profile.md` for what that profile supports and requires.
+
 ### Prepare a Docker test server
 
 The existing SWG server build and staging tools produce the matching
