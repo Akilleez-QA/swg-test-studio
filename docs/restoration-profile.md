@@ -22,8 +22,9 @@ The profile is bound once per process (`swg_test_studio/backend.py:113`) and han
 tool subprocesses in `SWG_STUDIO_SERVER_PROFILE` (`devtools/zones/server_profile.py:14`,
 `:169`). All constants live in `devtools/zones/server_profile.py`.
 
-**Status: nothing here has run against a live server.** No restoration test server
-exists yet; the profile is covered by offline tests and a compile check only.
+**Status: `login_relogin` has passed against one live restoration test server** (a Compose
+cluster built by the restoration repository's studio-server tools). Nothing else in this list has
+run live yet; the rest is covered by offline tests and a compile check only.
 
 ## What changes under `restoration`
 
@@ -114,7 +115,10 @@ whitengold profile makes, unless marked *(profile)*.
 - For a Studio-started server, role images are tagged `starwarsgalaxies/<role>:<tag>` and
   carry the Compose config hash (`swg_test_studio/docker_runtime.py:284-288`).
 - `central` has exactly one private IPv4 address, and its console listens there on port
-  61000 (`devtools/zones/restoration_console.py:13`, `:49-61`).
+  61000 (`devtools/zones/restoration_console.py:13`, `:49-61`). A `central` that joins another
+  container's network namespace (Compose `network_mode: service:taskmanager`; CentralServer reaches
+  its TaskManager only at 127.0.0.1) uses that container's one private address; the owner must be in
+  the same Compose project (`restoration_console.network_owner`, `agent_fixture.central_host`).
 - `central` writes `/opt/restoration/exe/linux/runtime.log` *(profile)* containing
   `Adding server <id> for scene <scene>` (`devtools/zones/protocol_driver.py:164`); `login`
   logs `Cluster <project> is ready for players.` (`swg_test_studio/docker_runtime.py:118`).
@@ -138,8 +142,9 @@ whitengold profile makes, unless marked *(profile)*.
 
 ## Missing or unverified
 
-- **No live run.** Login, creation, logout, the saved-state query, readiness and the
-  console request have not been exercised against a restoration server.
+- **One live run.** Login, settlement through the console `inspect` request, logout, full unload
+  and the saved-state query passed twice in `login_relogin`. Creation reached the first login;
+  readiness started by Studio (a stopped server) has not been exercised.
 - **No preparation tooling.** The schema copy, stage report, Compose files, image pins
   and overlay entrypoint come from WhiteNGold tools that are not ported. Somebody has to
   produce a server meeting the list above.
