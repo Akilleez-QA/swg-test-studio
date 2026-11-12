@@ -488,6 +488,69 @@ hashes of every `agent_*.java` (`--check` only reports what is stale).
 | `give` | `agent_fixture` | oid | yes | - |
 | `completeCollection` | `agent_fixture` | name | yes | - |
 | `clearDecor` | `agent_fixture` | oid, tag | yes | - |
+| `stats` | `agent_character` | - | no | - |
+| `buffs` | `agent_character` | name (optional) | no | - |
+| `standing` | `agent_character` | char_faction | no | - |
+| `setHealth` | `agent_character` | char_pool | yes | - |
+| `setAction` | `agent_character` | char_pool | yes | - |
+| `setMaxHealth` | `agent_character` | char_pool | yes | - |
+| `setMaxAction` | `agent_character` | char_pool | yes | - |
+| `healFull` | `agent_character` | - | yes | - |
+| `incapacitate` | `agent_character` | - | yes | - |
+| `revive` | `agent_character` | - | yes | - |
+| `setPosture` | `agent_character` | char_posture | yes | - |
+| `setLevel` | `agent_character` | char_level | yes | - |
+| `setProfession` | `agent_character` | char_profession, char_level (optional) | yes | - |
+| `revokeSkills` | `agent_character` | regex | yes | - |
+| `resetExpertise` | `agent_character` | - | yes | - |
+| `setBank` | `agent_character` | char_credits | yes | - |
+| `setCash` | `agent_character` | char_credits | yes | - |
+| `depositCash` | `agent_character` | char_credits | yes | - |
+| `withdrawCash` | `agent_character` | char_credits | yes | - |
+| `setFaction` | `agent_character` | char_aligned | yes | - |
+| `setStanding` | `agent_character` | char_faction, char_standing | yes | - |
+| `setPvpType` | `agent_character` | char_pvp | yes | - |
+| `applyBuff` | `agent_character` | name, char_seconds | yes | - |
+| `removeBuff` | `agent_character` | name | yes | - |
+| `equipItem` | `agent_character` | oid | yes | - |
+| `unequipItem` | `agent_character` | oid | yes | - |
+| `giveStaticCount` | `agent_character` | name, char_count | yes | required |
+| `bring` | `agent_multi` | role, bring_offset (optional) (argument 1 is a role) | yes | - |
+| `distanceTo` | `agent_multi` | role (argument 1 is a role) | no | - |
+| `groupOf` | `agent_multi` | role (optional) (argument 1 is a role) | no | - |
+| `groupLeave` | `agent_multi` | role (optional) (argument 1 is a role) | yes | - |
+| `creditsOf` | `agent_multi` | role (argument 1 is a role) | no | - |
+| `accountOf` | `agent_multi` | role (argument 1 is a role) | no | - |
+| `tradeState` | `agent_multi` | role (optional) (argument 1 is a role) | no | - |
+| `snapshot` | `agent_multi` | snapshot_name, role (optional) (argument 2 is a role) | yes | - |
+| `diff` | `agent_multi` | snapshot_name, role (optional) (argument 2 is a role) | no | - |
+| `snapshotDrop` | `agent_multi` | snapshot_name, role (optional) (argument 2 is a role) | yes | - |
+| `giveTo` | `agent_multi` | role, oid (argument 1 is a role) | yes | - |
+| `payTo` | `agent_multi` | role, pay_amount (argument 1 is a role) | yes | - |
+| `scenarioBegin` | `agent_scenario` | scenario | yes | - |
+| `scenarioEnd` | `agent_scenario` | scenario | yes | - |
+| `scenarioList` | `agent_scenario` | scenario | no | - |
+| `createAt` | `agent_scenario` | objtemplate, worldxz, worldxz, yaw | yes | required |
+| `createInCell` | `agent_scenario` | objtemplate, oid, cell, celllocal, celllocal, celllocal, yaw | yes | required |
+| `createInInventory` | `agent_scenario` | objtemplate, spawncount (optional) | yes | required |
+| `destroyCreated` | `agent_scenario` | oid | yes | - |
+| `spawnCreature` | `agent_scenario` | creaturename, spawnoffset, spawnoffset, spawnlevel (optional) | yes | required |
+| `creatureAttack` | `agent_scenario` | oid | yes | - |
+| `creaturePassive` | `agent_scenario` | oid | yes | - |
+| `creatureInvulnerable` | `agent_scenario` | oid, onoff | yes | - |
+| `creatureMove` | `agent_scenario` | oid, spawnoffset, spawnoffset | yes | - |
+| `creatureKill` | `agent_scenario` | oid | yes | - |
+| `creatureDespawn` | `agent_scenario` | oid | yes | - |
+| `questGrant` | `agent_scenario` | questname | yes | - |
+| `questComplete` | `agent_scenario` | questname | yes | - |
+| `questClear` | `agent_scenario` | questname | yes | - |
+| `questSignal` | `agent_scenario` | questsignal | yes | - |
+| `quests` | `agent_scenario` | - | no | - |
+| `setTestVar` | `agent_scenario` | vartarget, varname, vartype, varvalue | yes | - |
+| `clearTestVar` | `agent_scenario` | vartarget, varname | yes | - |
+| `getTestVar` | `agent_scenario` | vartarget, varname (optional) | no | - |
+| `warpScene` | `agent_scenario` | scenename, worldxz, worldy, worldxz | yes | - (changes scene) |
+| `face` | `agent_scenario` | yaw | yes | - |
 <!-- agent-fixture-ops:end -->
 
 ## Verify and coverage limits
