@@ -1,29 +1,43 @@
-"""Typed arrange/assert calls into the server-side fixture `script.fixture.agent_fixture`.
+"""Typed arrange/assert calls into the server-side fixture classes `script.fixture.agent_*`.
 
-The fixture (devtools/zones/fixtures/agent_fixture.java) runs only on an isolated
-client fixture (GameServer.clientIsolationFixture=1, a WGC_ copied schema) and acts
-only on one exact registered non-god test bot. This module is its host side:
+The fixtures (devtools/zones/fixtures/agent_*.java) run only on an isolated client
+fixture (GameServer.clientIsolationFixture=1, a WGC_ copied schema) and act only on
+one exact registered non-god test bot. This module is their host side:
 
-* OPS is the closed list of methods and their argument types. Nothing else is sent;
+* OPS is the closed list of methods and their argument types: the core fixture's own
+  methods merged with every op family found in `swg_test_studio/fixture_ops/` (one
+  module and one Java class per family; see docs/fixture-core.md). Nothing else is sent;
   there is no free-form console command, script name or expression.
 * The console message is a ConGenericMessage sent to the CentralServer console port
   of the fixture's private Docker network, framed as the server's TcpClient expects.
 * The game server that owns the bot is found with the existing driver's bot query.
 
 Steps use it as  {"action": "agent_fixture", "options": {"role": R, "op": OP,
-"args": [...], "expect": {key: value}}}.  `expect` compares exact strings in the
-fixture's reply; the step fails on any status other than `ok` or a mismatch.
+"args": [...], "scenario": ID?, "expect": {key: value}}}.  `expect` compares exact
+strings in the fixture's reply; the step fails on any status other than `ok` or a
+mismatch. `scenario` is required by (and only allowed for) a family's SCENARIO_OPS and
+is sent as the first argument after the identity.
+
+`python3 -m swg_test_studio.agent_fixture refresh` regenerates the README op table and
+the bundled-tool hashes of every devtools/zones/fixtures/agent_*.java; `--check` only
+reports whether either is stale.
 """
+import importlib
 import ipaddress
+import pkgutil
 import re
 import socket
 import struct
+import time
 
-SCRIPT = "fixture.agent_fixture"
+FIXTURE = "agent_fixture"
+SCRIPT = "fixture." + FIXTURE
 CONSOLE_PORT = 61000
 
 _NUMBER = r"-?[0-9]{1,5}(\.[0-9]{1,6})?"  # the fixture's NUM_RE
-TYPES = {
+ROLE_KIND, ROLE_RE = "role", r"[a-z][a-z0-9_]{0,31}"
+SCENARIO_KIND, SCENARIO_RE = "scenario", r"[a-z][a-z0-9_]{0,31}"
+CORE_TYPES = {
     "oid": r"[1-9][0-9]{0,18}",
     "oids": r"[1-9][0-9]{0,18}(,[1-9][0-9]{0,18}){0,31}",
     "coord": _NUMBER,
@@ -37,13 +51,16 @@ TYPES = {
     "tag": r"[A-Za-z0-9_*]{1,64}",
     "regex": r"[A-Za-z0-9_.*^$|()\[\]+?-]{1,64}",
     "mods": r"[a-z0-9_]{1,64}=-?[0-9]{1,5}(,[a-z0-9_]{1,64}=-?[0-9]{1,5}){0,31}",
+    # Shared kinds of the op families (sources/interface.md): a family may reuse them only verbatim.
+    ROLE_KIND: ROLE_RE,
+    SCENARIO_KIND: SCENARIO_RE,
 }
 
 # Numeric limits the fixture enforces (agent_fixture.java); checked here so a bad step fails at validation.
-RANGES = {"yaw": (-360.0, 360.0), "scale": (0.05, 20.0), "radius": (0.0, 128.0)}
+CORE_RANGES = {"yaw": (-360.0, 360.0), "scale": (0.05, 20.0), "radius": (0.0, 128.0)}
 
 # name -> (argument types, mutates). Optional trailing arguments are written "type?".
-OPS = {
+CORE_OPS = {
     "inspect": ((), False),
     "nearby": (("radius",), False),
     "cells": (("oid",), False),
@@ -70,16 +87,186 @@ OPS = {
 }
 
 IDENTITY = re.compile(r"[1-9][0-9]{0,18}:[1-9][0-9]{0,9}:Cap[a-z]{12}")
+# Every argument, whatever its family regex, must be one bounded printable ASCII token:
+# no whitespace (it would split the console line) and no control bytes.
+TOKEN = re.compile(r"[\x21-\x7e]{1,512}")
+
+# --- Op families --------------------------------------------------------------------------
+
+FAMILY_PACKAGE = __package__ + ".fixture_ops"
+FAMILY_NAME = re.compile(r"[a-z][a-z0-9_]{0,23}")
+OP_NAME = re.compile(r"[a-z][A-Za-z0-9]{0,31}")
+KIND_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}")
+FAMILY_NAMES = frozenset({"FIXTURE", "TYPES", "RANGES", "OPS", "ROLE_ARGS", "check", "SCENARIO_OPS",
+                          "SCENE_CHANGING"})
+SCENARIO_BEGIN, SCENARIO_END = "scenarioBegin", "scenarioEnd"
+MAX_FAMILIES = 16
+# Bounded wait for the bot to be found again on a game server after a SCENE_CHANGING op.
+RELOCATE_SECONDS = 90.0
+RELOCATE_INTERVAL = 1.0
 
 
-def validate(options, roles):
-    """Static validation for a Studio step; raises ValueError."""
-    if not isinstance(options, dict) or set(options) - {"role", "op", "args", "expect"} or \
+class Registry:
+    """The merged, validated op table: core ops plus every family's ops."""
+
+    def __init__(self):
+        self.types = dict(CORE_TYPES)
+        self.ranges = dict(CORE_RANGES)
+        self.ops = dict(CORE_OPS)
+        self.fixture_of = {op: FIXTURE for op in CORE_OPS}
+        self.role_args = {}
+        self.scenario_ops = set()
+        self.scene_changing = set()
+        self.checks = {}
+        self.families = {}  # family name -> fixture class name
+
+    @property
+    def fixtures(self):
+        return (FIXTURE, *sorted(self.families.values()))
+
+    def script(self, op):
+        return "fixture." + self.fixture_of[op]
+
+
+def _family(name, module, registry):
+    """Validate one family module against sources/interface.md and merge it; raises ValueError."""
+    def bad(why):
+        raise ValueError(f"Fixture op family {name!r}: {why}")
+
+    if not FAMILY_NAME.fullmatch(name) or name == "fixture":
+        bad("module name must be a lowercase family name other than 'fixture'")
+    values = {key: getattr(module, key) for key in FAMILY_NAMES if hasattr(module, key)}
+    fixture, types, ops = values.get("FIXTURE"), values.get("TYPES"), values.get("OPS")
+    if fixture != "agent_" + name:
+        bad("FIXTURE must be 'agent_" + name + "'")
+    if fixture in registry.families.values():
+        bad("duplicate fixture class")
+    if not isinstance(types, dict) or not isinstance(ops, dict) or not ops:
+        bad("TYPES and a non-empty OPS dict are required")
+    ranges = values.get("RANGES", {})
+    role_args = values.get("ROLE_ARGS", {})
+    scenario_ops = values.get("SCENARIO_OPS", frozenset())
+    scene_changing = values.get("SCENE_CHANGING", frozenset())
+    check = values.get("check")
+    if not isinstance(ranges, dict) or not isinstance(role_args, dict):
+        bad("RANGES and ROLE_ARGS must be dicts")
+    if not isinstance(scenario_ops, (set, frozenset)) or not isinstance(scene_changing, (set, frozenset)):
+        bad("SCENARIO_OPS and SCENE_CHANGING must be sets")
+    if check is not None and not callable(check):
+        bad("check must be a function")
+    types_after = dict(registry.types)
+    for kind, regex in types.items():
+        if not isinstance(kind, str) or not KIND_NAME.fullmatch(kind) or not isinstance(regex, str):
+            bad("argument kinds are lowercase names mapped to regex strings")
+        try:
+            re.compile(regex)
+        except re.error:
+            bad(f"kind {kind!r} has an invalid regex")
+        if kind in types_after and types_after[kind] != regex:
+            bad(f"kind {kind!r} redefined with a different regex")
+        types_after[kind] = regex
+    ranges_after = dict(registry.ranges)
+    for kind, bounds in ranges.items():
+        if (kind not in types_after or not isinstance(bounds, tuple) or len(bounds) != 2 or
+                any(type(b) not in (int, float) for b in bounds) or not bounds[0] <= bounds[1]):
+            bad(f"range for {kind!r} must be (low, high) on a declared kind")
+        if kind in ranges_after and tuple(ranges_after[kind]) != tuple(bounds):
+            bad(f"range for {kind!r} redefined with different bounds")
+        ranges_after[kind] = bounds
+    for op, entry in ops.items():
+        if not isinstance(op, str) or not OP_NAME.fullmatch(op):
+            bad(f"op name {op!r} is not a lowerCamel method name")
+        if op in registry.ops:
+            bad(f"op {op!r} is already defined by {registry.fixture_of[op]}")
+        if (not isinstance(entry, tuple) or len(entry) != 2 or not isinstance(entry[0], tuple) or
+                type(entry[1]) is not bool):
+            bad(f"op {op!r} must map to ((kind, ...), mutating_bool)")
+        optional = False
+        for kind in entry[0]:
+            if not isinstance(kind, str) or kind.rstrip("?") not in types_after or kind.count("?") > 1 or \
+                    ("?" in kind and not kind.endswith("?")):
+                bad(f"op {op!r} uses an undeclared argument kind {kind!r}")
+            if optional and not kind.endswith("?"):
+                bad(f"op {op!r}: optional arguments must be trailing")
+            optional = optional or kind.endswith("?")
+    for op, positions in role_args.items():
+        if op not in ops or not isinstance(positions, tuple) or not positions or \
+                len(set(positions)) != len(positions):
+            bad(f"ROLE_ARGS for {op!r} must be a tuple of distinct positions of one of its ops")
+        for index in positions:
+            spec = ops[op][0]
+            if type(index) is not int or not 0 <= index < len(spec) or spec[index].rstrip("?") != ROLE_KIND:
+                bad(f"ROLE_ARGS position {index!r} of {op!r} is not a 'role' argument")
+    for label, chosen in (("SCENARIO_OPS", scenario_ops), ("SCENE_CHANGING", scene_changing)):
+        if not set(chosen) <= set(ops):
+            bad(label + " names ops the family does not define")
+    registry.types = types_after
+    registry.ranges = ranges_after
+    for op, entry in ops.items():
+        registry.ops[op] = entry
+        registry.fixture_of[op] = fixture
+        if check is not None:
+            registry.checks[op] = check
+    registry.role_args.update(role_args)
+    registry.scenario_ops |= set(scenario_ops)
+    registry.scene_changing |= set(scene_changing)
+    registry.families[name] = fixture
+
+
+def merge(families):
+    """Merge (name, module) pairs into one Registry; refuses any interface violation."""
+    families = list(families)
+    if len(families) > MAX_FAMILIES:
+        raise ValueError("Too many fixture op families")
+    registry = Registry()
+    for name, module in sorted(families, key=lambda item: item[0]):
+        _family(name, module, registry)
+    return registry
+
+
+def discover(package=FAMILY_PACKAGE):
+    """(name, module) for every public module of the fixture_ops package."""
+    root = importlib.import_module(package)
+    return [(info.name, importlib.import_module(package + "." + info.name))
+            for info in sorted(pkgutil.iter_modules(root.__path__), key=lambda i: i.name)
+            if not info.name.startswith("_") and not info.ispkg]
+
+
+# The merged tables. Defined first with the core entries so a family module may import them
+# while it is itself being discovered; filled in place with the families below.
+TYPES = dict(CORE_TYPES)
+RANGES = dict(CORE_RANGES)
+OPS = dict(CORE_OPS)
+REGISTRY = merge(discover())
+TYPES.update(REGISTRY.types)
+RANGES.update(REGISTRY.ranges)
+OPS.update(REGISTRY.ops)
+
+
+def validate(options, roles, registry=None):
+    """Static validation for a Studio step; raises ValueError.
+
+    `roles` are the suite's roles. An op's ROLE_ARGS must name another of them (never the
+    acting role); a family's SCENARIO_OPS require a `scenario` id and no other op takes one.
+    """
+    registry = registry or REGISTRY
+    if not isinstance(options, dict) or set(options) - {"role", "op", "args", "expect", "scenario"} or \
             not {"role", "op", "args"} <= set(options):
-        raise ValueError("agent_fixture requires role, op and args (and optional expect)")
+        raise ValueError("agent_fixture requires role, op and args (and optional scenario, expect)")
     if options["role"] not in roles:
         raise ValueError("Unknown agent_fixture role")
-    arguments(options["op"], options["args"])
+    args = arguments(options["op"], options["args"], registry)
+    for index in registry.role_args.get(options["op"], ()):
+        if index < len(args):
+            if args[index] not in roles:
+                raise ValueError(f"{options['op']}: role {args[index]!r} is not a role of this test")
+            if args[index] == options["role"]:
+                raise ValueError(f"{options['op']}: name another bot's role, not the acting role")
+    if options["op"] in registry.scenario_ops:
+        if not isinstance(options.get("scenario"), str) or not re.fullmatch(SCENARIO_RE, options["scenario"]):
+            raise ValueError(f"{options['op']} creates world state: give its scenario id")
+    elif "scenario" in options:
+        raise ValueError(f"{options['op']} takes no scenario id")
     expect = options.get("expect", {})
     if (not isinstance(expect, dict) or len(expect) > 32 or
             any(not re.fullmatch(r"[a-z][a-zA-Z0-9_]{0,31}", k) or not isinstance(v, str) or
@@ -88,10 +275,11 @@ def validate(options, roles):
     return options
 
 
-def arguments(op, args):
-    if op not in OPS:
+def arguments(op, args, registry=None):
+    registry = registry or REGISTRY
+    if not isinstance(op, str) or op not in registry.ops:
         raise ValueError("Unknown agent_fixture operation; only typed fixture methods are allowed")
-    spec, _ = OPS[op]
+    spec, _ = registry.ops[op]
     if not isinstance(args, list) or any(not isinstance(a, str) for a in args):
         raise ValueError("agent_fixture args must be a list of strings")
     required = [t for t in spec if not t.endswith("?")]
@@ -99,24 +287,87 @@ def arguments(op, args):
         raise ValueError(f"{op} takes {len(required)}-{len(spec)} arguments")
     for kind, value in zip(spec, args):
         kind = kind.rstrip("?")
-        if not re.fullmatch(TYPES[kind], value):
+        if not TOKEN.fullmatch(value) or not re.fullmatch(registry.types[kind], value):
             raise ValueError(f"{op}: invalid {kind} argument")
-        low, high = RANGES.get(kind, (None, None))
+        low, high = registry.ranges.get(kind, (None, None))
         if low is not None and not low <= float(value) <= high:
             raise ValueError(f"{op}: {kind} must be within {low}..{high}")
         if kind == "mods" and any(abs(int(pair.split("=")[1])) > 10000 for pair in value.split(",")):
             raise ValueError(f"{op}: item bonus values must be within -10000..10000")
+    if op in registry.checks:
+        registry.checks[op](op, list(args))
     return list(args)
 
 
-def command(worker, bot, op, args):
-    """The exact console line; refuses anything outside OPS and the identity contract."""
-    if type(worker) is not int or not 0 < worker <= 2147483647:
-        raise ValueError("Invalid game server id")
+def identity_text(bot):
     ident = f"{bot['player']}:{bot['station']}:{bot['character']}"
     if not IDENTITY.fullmatch(ident):
         raise ValueError("Bot identity does not match the fixture contract")
-    return " ".join(["game", str(worker), "runScript", SCRIPT, op, ident, *arguments(op, args)])
+    return ident
+
+
+def command(worker, bot, op, args, *, scenario=None, identities=None, registry=None):
+    """The exact console line; refuses anything outside OPS and the identity contract.
+
+    `identities` maps each role named by the op's ROLE_ARGS to that role's registered bot;
+    the role name is replaced by its `oid:station:Cap...` identity. A SCENARIO_OPS op gets
+    `scenario` as its first argument after the acting identity.
+    """
+    registry = registry or REGISTRY
+    if type(worker) is not int or not 0 < worker <= 2147483647:
+        raise ValueError("Invalid game server id")
+    ident = identity_text(bot)
+    values = arguments(op, args, registry)
+    for index in registry.role_args.get(op, ()):
+        if index < len(values):
+            other = (identities or {}).get(values[index])
+            if other is None:
+                raise ValueError(f"{op}: role {values[index]!r} has no registered bot")
+            values[index] = identity_text(other)
+            if values[index] == ident:
+                raise ValueError(f"{op}: the other bot must not be the acting bot")
+    if op in registry.scenario_ops:
+        if not isinstance(scenario, str) or not re.fullmatch(SCENARIO_RE, scenario):
+            raise ValueError(f"{op} requires a scenario id")
+        values.insert(0, scenario)
+    elif scenario is not None:
+        raise ValueError(f"{op} takes no scenario id")
+    return " ".join(["game", str(worker), "runScript", registry.script(op), op, ident, *values])
+
+
+def scenario_ids(steps, registry=None):
+    """Scenario bookkeeping of a suite's agent_fixture steps (plan): id -> begun/ended/used."""
+    registry = registry or REGISTRY
+    found = {}
+
+    def entry(name):
+        return found.setdefault(name, {"id": name, "begun": [], "ended": [], "used": []})
+
+    for step in steps:
+        options = step.get("options", {})
+        op = options.get("op")
+        if op in (SCENARIO_BEGIN, SCENARIO_END):
+            name = options.get("scenario") if op in registry.scenario_ops else (options.get("args") or [None])[0]
+            if name:
+                entry(name)["begun" if op == SCENARIO_BEGIN else "ended"].append(step["id"])
+        elif options.get("scenario"):
+            entry(options["scenario"])["used"].append(step["id"])
+    return sorted(found.values(), key=lambda row: row["id"])
+
+
+def scenario_end_options(role, scenario, registry=None):
+    """The scenarioEnd step options for one scenario id (CLI scenario-end)."""
+    registry = registry or REGISTRY
+    if SCENARIO_END not in registry.ops:
+        raise ValueError("No fixture op family provides scenarioEnd; the scenario family is not installed")
+    if not isinstance(scenario, str) or not re.fullmatch(SCENARIO_RE, scenario):
+        raise ValueError("Invalid scenario id")
+    if SCENARIO_END in registry.scenario_ops:
+        options = {"role": role, "op": SCENARIO_END, "args": [], "scenario": scenario}
+    else:
+        options = {"role": role, "op": SCENARIO_END, "args": [scenario]}
+    validate(options, [role], registry)
+    return options
 
 
 # --- ConGenericMessage framing (sharedNetworkMessages ConsoleChannelMessages) -------------
@@ -198,12 +449,18 @@ def _read(conn, size):
     return data
 
 
-def parse(text):
-    """`agent_fixture=<status> key=value ... row=...` -> dict with status, fields, rows."""
+def parse(text, fixture=None, registry=None):
+    """`agent_<family>=<status> key=value ... row=...` -> dict with fixture, status, fields, rows.
+
+    Accepts the reply prefix of `fixture` only, or of any known fixture class when None.
+    """
+    registry = registry or REGISTRY
+    allowed = (fixture,) if fixture else registry.fixtures
     first, _, _ = text.strip().partition("\n")
     tokens = first.split()
-    if not tokens or not tokens[0].startswith("agent_fixture="):
-        return {"status": "unrecognized", "fields": {}, "rows": [], "raw": text[:500]}
+    prefix = tokens[0].split("=", 1)[0] if tokens and "=" in tokens[0] else None
+    if prefix not in allowed:
+        return {"fixture": None, "status": "unrecognized", "fields": {}, "rows": [], "raw": text[:500]}
     fields, rows = {}, []
     for token in tokens[1:]:
         key, sep, value = token.partition("=")
@@ -213,7 +470,7 @@ def parse(text):
             rows.append(value)
         else:
             fields[key] = value
-    return {"status": tokens[0].split("=", 1)[1], "fields": fields, "rows": rows}
+    return {"fixture": prefix, "status": tokens[0].split("=", 1)[1], "fields": fields, "rows": rows}
 
 
 def check(reply, expect):
@@ -235,20 +492,61 @@ def central_host(project, inspect):
     return private_address(addresses[0])
 
 
-def run_live(options, env, registry):
-    """Execute one agent_fixture step against the registered bot; returns an artifact dict."""
+def relocate(query, before=None, scene=None, *, timeout=RELOCATE_SECONDS, interval=RELOCATE_INTERVAL,
+             sleep=time.sleep, clock=time.monotonic):
+    """After a scene-changing op: wait (bounded) until the bot query finds the bot again.
+
+    Done when exactly one game server reports the bot and, when the op's reply named the
+    target `scene`, that server reports the bot in that scene. A census that sees the bot on
+    two servers during the hand-off raises inside the query and is retried. Read-only.
+    """
+    started = clock()
+    last = None
+    while True:
+        try:
+            current = query()
+        except RuntimeError as exc:  # transient double census during the hand-off
+            current, last = None, str(exc)
+        if current and (scene is None or current.get("scene") == scene):
+            return {"worker": int(current["worker"]), "scene": current.get("scene"),
+                    "moved_server": before is not None and int(current["worker"]) != int(before["worker"]),
+                    "seconds": round(clock() - started, 3)}
+        if clock() - started >= timeout:
+            raise RuntimeError(f"The bot was not found again in scene {scene or 'any'} within {timeout:.0f} s"
+                               + (f" ({last})" if last else ""))
+        sleep(interval)
+
+
+def _registered_bot(driver, folder, key):
+    if not isinstance(key, str) or not re.fullmatch("[a-z]{3,16}", key):
+        raise ValueError("A dedicated registry key is required")
+    import json
+    return driver.identity(json.loads((folder / "protocol-driver" / (key + ".json")).read_text()))
+
+
+def run_live(options, env, registry, bindings=None):
+    """Execute one agent_fixture step against the registered bot; returns an artifact dict.
+
+    `registry` is the acting role's registry key; `bindings` maps every role of the run to its
+    registry key (needed for ops that name another role's bot).
+    """
     import json
     import subprocess
     from pathlib import Path
     from .backend import driver_modules
 
-    validate(options, [options["role"]])
+    bindings = dict(bindings or {options["role"]: registry})
+    if bindings.get(options["role"], registry) != registry:
+        raise ValueError("The acting role is bound to a different registry")
+    bindings[options["role"]] = registry
+    validate(options, list(bindings))
+    op = options["op"]
     driver, _ = driver_modules(env)
-    if not re.fullmatch("[a-z]{3,16}", registry):
-        raise ValueError("A dedicated registry key is required")
     folder = Path(env["folder"]).resolve(strict=True)
     project, _schema, _services = driver.fixture(folder)
-    bot = driver.identity(json.loads((folder / "protocol-driver" / (registry + ".json")).read_text()))
+    bot = _registered_bot(driver, folder, registry)
+    others = {options["args"][i] for i in REGISTRY.role_args.get(op, ()) if i < len(options["args"])}
+    identities = {role: _registered_bot(driver, folder, bindings[role]) for role in sorted(others)}
     current = driver.bot_query(project, bot)
     if not current:
         raise RuntimeError("The registered bot is not loaded on any fixture game server")
@@ -257,19 +555,38 @@ def run_live(options, env, registry):
         out = subprocess.run(["docker", "inspect", name], capture_output=True, text=True, check=True).stdout
         return json.loads(out)
 
-    line = command(int(current["worker"]), bot, options["op"], options["args"])
-    reply = parse(send(central_host(project, inspect), line))
-    print("AGENT_FIXTURE", options["op"], reply["status"], json.dumps(reply["fields"], sort_keys=True), flush=True)
+    line = command(int(current["worker"]), bot, op, options["args"], scenario=options.get("scenario"),
+                   identities=identities)
+    fixture = REGISTRY.fixture_of[op]
+    reply = parse(send(central_host(project, inspect), line), fixture)
+    print("AGENT_FIXTURE", fixture, op, reply["status"], json.dumps(reply["fields"], sort_keys=True), flush=True)
     failure = check(reply, options.get("expect"))
     if failure:
-        raise RuntimeError(f"agent_fixture {options['op']}: {failure}")
-    return {"op": options["op"], "mutates": OPS[options["op"]][1], "reply": reply}
+        raise RuntimeError(f"{fixture} {op}: {failure}")
+    artifact = {"fixture": fixture, "op": op, "mutates": OPS[op][1], "reply": reply}
+    if options.get("scenario"):
+        artifact["scenario"] = options["scenario"]
+    if op in REGISTRY.scene_changing:
+        # The next call must reach the bot's new game server: wait until the bot query finds it.
+        artifact["relocated"] = relocate(lambda: driver.bot_query(project, bot), current,
+                                         reply["fields"].get("scene"))
+        print("AGENT_FIXTURE_RELOCATED", json.dumps(artifact["relocated"], sort_keys=True), flush=True)
+    return artifact
+
+
+def scenario_end(env, role, scenario):
+    """Clean up one scenario after a failed run: scenarioEnd for the role's bot."""
+    bindings = env["bindings"]
+    if role not in bindings:
+        raise ValueError("The environment binds no registry to role " + str(role))
+    return run_live(scenario_end_options(role, scenario), env, bindings[role], bindings)
 
 
 # --- Installation into an isolated fixture --------------------------------------------------
 
 RUNTIME_SCRIPTS = "/opt/whitengold/data/sku.0/sys.server/compiled/game/script"
 RELEASE = {52: "8", 55: "11", 61: "17", 65: "21"}
+FIXTURE_SOURCE = re.compile(r"agent_[a-z][a-z0-9_]{0,23}\.java")
 
 
 def reload_command(worker, script=SCRIPT):
@@ -301,12 +618,38 @@ def fixture_workers(project, run, runtime_log="/opt/whitengold/exe/linux/runtime
     return workers
 
 
-def install(env, emit=print):
-    """Compile the fixture against the running fixture's own script classes and load it.
+def fixture_sources(tools, profile_fixtures, manifest_files, registry=None):
+    """Fixture sources (relative to devtools/zones) to install, in order.
 
-    Writes <folder>/fixture/classes/script/fixture/agent_fixture.class, where the fixture
-    overlay applies it at every game start, copies it into the running game container,
-    and reloads it on each registered game server. Refuses anything but an isolated fixture.
+    The profile's own fixtures first (the lean bot fixture before anything that could use a
+    newer helper), then every other fixtures/agent_*.java. Each must be a verified bundled
+    tool, and every discovered op family must have its Java class present.
+    """
+    registry = registry or REGISTRY
+    names = list(profile_fixtures)
+    present = sorted(p.name for p in (tools / "zones" / "fixtures").glob("agent_*.java"))
+    for name in present:
+        if not FIXTURE_SOURCE.fullmatch(name):
+            raise ValueError("Unexpected fixture source name: " + name)
+        if "fixtures/" + name not in names:
+            names.append("fixtures/" + name)
+    for fixture in registry.fixtures:
+        if fixture + ".java" not in present:
+            raise ValueError(f"Op family class {fixture} has no fixtures/{fixture}.java")
+    for name in names:
+        if "zones/" + name not in manifest_files:
+            raise ValueError(f"zones/{name} is not in devtools/studio-tools.json; "
+                             "run `python3 -m swg_test_studio.agent_fixture refresh`")
+    return names
+
+
+def install(env, emit=print):
+    """Compile every fixture class against the running fixture's own script classes and load it.
+
+    Writes <folder>/fixture/classes/script/fixture/<class>.class for each fixture source, where
+    the fixture overlay applies it at every game start, copies it into the running game
+    container, and reloads it on each registered game server. Each source must compile to
+    exactly one class file. Refuses anything but an isolated fixture.
     """
     import json
     import shutil
@@ -314,7 +657,7 @@ def install(env, emit=print):
     import tempfile
     from pathlib import Path
     from .backend import driver_modules
-    from .server_tools import profile_of, verified_tool_root
+    from .server_tools import profile_of, verified_tool_root, _bundle
 
     def run(argv, **kw):
         return subprocess.run(argv, capture_output=True, text=True, check=True, **kw).stdout
@@ -325,30 +668,111 @@ def install(env, emit=print):
     if not re.fullmatch(r"WGC_[A-F0-9]{12}", schema or ""):
         raise ValueError("The agent fixture installs only into an isolated copied-schema fixture")
     profile = profile_of(env)
-    # The profile's fixtures; the lean bot fixture first, so it never references a newer helper.
-    sources = [verified_tool_root() / "zones" / name for name in profile.fixtures]
+    tools = verified_tool_root()
+    names = fixture_sources(tools, profile.fixtures, _bundle.verify(tools))
+    sources = [tools / "zones" / name for name in names]
     scripts = profile.runtime_scripts
     game = services["game"]["Id"]
+    classes = []
     with tempfile.TemporaryDirectory(prefix="swg-agent-fixture-") as tmp:
         tmp = Path(tmp)
         run(["docker", "cp", f"{game}:{scripts}/.", str(tmp / "classpath" / "script")])
         release = class_release(tmp / "classpath" / "script" / "base_script.class")
-        out = tmp / "out"
         target = folder / "fixture" / "classes" / "script" / "fixture"
         target.mkdir(parents=True, exist_ok=True, mode=0o755)
-        for source in sources:
+        for index, source in enumerate(sources):
+            out = tmp / f"out{index}"
             run(["javac", "--release", release, "-encoding", "utf8", "-nowarn", "-implicit:none",
                  "-cp", str(tmp / "classpath"), "-d", str(out), str(source)])
             built = out / "script" / "fixture" / (source.stem + ".class")
+            if sorted(out.rglob("*.class")) != [built]:
+                raise RuntimeError(f"{source.name} must compile to exactly one class file")
             shutil.copy2(built, target / built.name)
             run(["docker", "cp", str(built), f"{game}:{scripts}/fixture/{built.name}"])
+            classes.append(str(target / built.name))
     host = central_host(project, lambda name: json.loads(run(["docker", "inspect", name])))
     workers = fixture_workers(project, run, profile.runtime_log)
-    replies = {w: send(host, reload_command(w)).strip()[:200] for w in workers}
+    replies = {}
     for source in sources:
-        if source.stem != "agent_fixture":
-            for w in workers:
-                replies[f"{w}:{source.stem}"] = send(host, reload_command(w, "fixture." + source.stem)).strip()[:200]
-    emit({"event": "agent_fixture_installed", "release": release, "class": str(target / "agent_fixture.class"),
-          "reloads": replies})
+        for w in workers:
+            key = w if source.stem == FIXTURE else f"{w}:{source.stem}"
+            replies[key] = send(host, reload_command(w, "fixture." + source.stem)).strip()[:200]
+    emit({"event": "agent_fixture_installed", "release": release, "classes": classes, "reloads": replies})
     return replies
+
+
+# --- Generated documentation and bundled-tool hashes ------------------------------------
+
+README_BEGIN = "<!-- agent-fixture-ops:begin (generated: python3 -m swg_test_studio.agent_fixture refresh) -->"
+README_END = "<!-- agent-fixture-ops:end -->"
+
+
+def op_table(registry=None):
+    """The README op table, generated from the merged OPS."""
+    registry = registry or REGISTRY
+    lines = ["| Operation | Fixture class | Arguments | Changes state | Scenario id |", "|---|---|---|---|---|"]
+    for op, (spec, mutates) in registry.ops.items():
+        kinds = ", ".join(k[:-1] + " (optional)" if k.endswith("?") else k for k in spec) or "-"
+        role = registry.role_args.get(op)
+        if role:
+            kinds += " (" + ", ".join(f"argument {i + 1} is a role" for i in role) + ")"
+        lines.append(f"| `{op}` | `{registry.fixture_of[op]}` | {kinds} | {'yes' if mutates else 'no'} | "
+                     f"{'required' if op in registry.scenario_ops else '-'}"
+                     f"{' (changes scene)' if op in registry.scene_changing else ''} |")
+    return "\n".join(lines) + "\n"
+
+
+def readme_with_table(text, registry=None):
+    head, sep, rest = text.partition(README_BEGIN)
+    _, sep2, tail = rest.partition(README_END)
+    if not sep or not sep2:
+        raise ValueError("README lacks the generated op table markers")
+    return head + README_BEGIN + "\n" + op_table(registry) + README_END + tail
+
+
+def manifest_with_fixtures(text, tools):
+    """studio-tools.json with every zones/fixtures/agent_*.java hash added or refreshed."""
+    import hashlib
+    import json
+    data = json.loads(text)
+    files = dict(data["files"])
+    for path in sorted((tools / "zones" / "fixtures").glob("agent_*.java")):
+        if not FIXTURE_SOURCE.fullmatch(path.name):
+            raise ValueError("Unexpected fixture source name: " + path.name)
+        files["zones/fixtures/" + path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    data["files"] = dict(sorted(files.items()))
+    return json.dumps(data, indent=2) + "\n"
+
+
+def refresh(root, check_only=False):
+    """Regenerate the README op table and the agent_*.java manifest hashes; returns stale paths."""
+    from pathlib import Path
+    root = Path(root)
+    targets = {root / "README.md": lambda t: readme_with_table(t),
+               root / "devtools" / "studio-tools.json": lambda t: manifest_with_fixtures(t, root / "devtools")}
+    stale = []
+    for path, make in targets.items():
+        old = path.read_text(encoding="utf-8")
+        new = make(old)
+        if new != old:
+            stale.append(path.relative_to(root).as_posix())
+            if not check_only:
+                path.write_text(new, encoding="utf-8")
+    return stale
+
+
+def main(argv=None):
+    import argparse
+    import sys
+    from pathlib import Path
+    parser = argparse.ArgumentParser(prog="python3 -m swg_test_studio.agent_fixture")
+    parser.add_argument("command", choices=("refresh",))
+    parser.add_argument("--check", action="store_true", help="only report stale files; exit 1 if any")
+    args = parser.parse_args(argv)
+    stale = refresh(Path(__file__).resolve().parents[1], check_only=args.check)
+    print(("stale: " if args.check else "refreshed: ") + (", ".join(stale) or "nothing"))
+    return int(args.check and bool(stale))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

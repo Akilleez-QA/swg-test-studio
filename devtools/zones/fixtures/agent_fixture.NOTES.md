@@ -5,6 +5,10 @@ ordinary (non-god) protocol bots. It is ported from our personal-play console sc
 `developer.claude.cli` (plus `give_static`). The trust in a hard-coded god character is
 gone. The guards follow the `identity()`/`player()` pattern in `protocol_bot.java`.
 
+Op families (`agent_<family>` classes) copy this class's guard and helpers verbatim; change
+them here only together with every family. How Studio finds, routes, runs and installs the
+families: `docs/fixture-core.md`.
+
 Call: `game <serverId> runScript fixture.agent_fixture <method> <oid>:<stationId>:<characterName> [args...]`
 
 Reply: one line, `agent_fixture=<status> key=value ...`. Values are percent-encoded: any

@@ -12,7 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from .model import compile_suite, exact, ROLE
-from .agent_fixture import OPS as AGENT_OPS
+from .agent_fixture import OPS as AGENT_OPS, REGISTRY as AGENT_REGISTRY, scenario_ids
 from .server_tools import load_tool, profile_of, source_folder, tool_environment, verified_tool_root
 from .store import read_json, write_json
 
@@ -85,6 +85,11 @@ def plan(suite, env):
         case["kind"] not in ("protocol_session", "studio_journey", "studio_action_sequence", "agent_fixture")
         for case in cases if case["kind"] != "driver_unit"
     )
+    fixture_steps = [case for case in cases if case["kind"] == "agent_fixture"]
+    scenarios = scenario_ids(fixture_steps)
+    partners = sorted({case["options"]["args"][i] for case in fixture_steps
+                       for i in AGENT_REGISTRY.role_args.get(case["options"]["op"], ())
+                       if i < len(case["options"]["args"])})
     return {"schema_version": 1, "suite": suite["id"], "environment": env["name"],
             **({} if profile.case_kinds is None else {"profile": profile.name}),
             "bindings": bindings, "manifest": manifest,
@@ -96,7 +101,16 @@ def plan(suite, env):
                 "group_cleanup_possible": "form_group" in action_kinds,
                 "agent_fixture_changes": sorted({case["options"]["op"] for case in cases
                                                  if case["kind"] == "agent_fixture" and AGENT_OPS[case["options"]["op"]][1]}),
-                "service_restart": False, "client_changed": False}}
+                "service_restart": False, "client_changed": False,
+                # Only for suites with fixture steps, so every other plan stays as it was.
+                **({} if not fixture_steps else {
+                    "agent_fixture_classes": sorted({AGENT_REGISTRY.fixture_of[case["options"]["op"]]
+                                                     for case in fixture_steps}),
+                    "agent_fixture_partner_roles": partners,
+                    "agent_fixture_scenarios": scenarios,
+                    # True when every scenario begun or used is also ended in the suite; otherwise
+                    # its objects outlive the run until `scenario-end` removes them.
+                    "agent_fixture_scenarios_all_ended": all(row["ended"] for row in scenarios)})}}
 
 
 def require_profile_support(suite, profile):
@@ -152,6 +166,8 @@ def run_suite(suite, env, workspace, emit=print):
                   "manifest_sha256": hashlib.sha256((output / "manifest.json").read_bytes()).hexdigest(),
                   "application_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                          for p in Path(__file__).parent.glob("*.py")}}
+        report["application_sha256"].update({"fixture_ops/" + p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                             for p in sorted(Path(__file__).parent.glob("fixture_ops/*.py"))})
         try:
             emit({"event": "run_preparing", "operation": operation, "cases": len(manifest["tests"])})
             report["source_hashes"] = legacy.source_hashes()
@@ -173,7 +189,8 @@ def run_suite(suite, env, workspace, emit=print):
                     if case["kind"] == "agent_fixture":
                         from .agent_fixture import run_live as run_fixture
                         with case_log.open("x") as log, contextlib.redirect_stdout(log):
-                            row["artifact"] = run_fixture(case["options"], env, selected["bindings"][case["options"]["role"]])
+                            row["artifact"] = run_fixture(case["options"], env, selected["bindings"][case["options"]["role"]],
+                                                          selected["bindings"])
                         row.update(exit_code=0, timed_out=False, passed=True)
                     elif case["kind"] == "studio_journey":
                         from .journey import run_live

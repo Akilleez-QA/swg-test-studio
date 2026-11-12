@@ -427,9 +427,10 @@ protocol driver; the fixture prepares and inspects, it never plays for the bot.
 ```
 
 Install it once per prepared test server with
-`python3 swg-tests.py install-agent-fixture --environment environment.json`: it compiles the fixture
-against that server's own script classes, writes it where the fixture overlay re-applies it on every
-game start, and reloads it on each game server without a restart.
+`python3 swg-tests.py install-agent-fixture --environment environment.json`: it compiles every fixture
+class (`agent_fixture` and each `agent_<family>` present, plus the profile's bot fixture) against that
+server's own script classes, one class file each, writes them where the fixture overlay re-applies them
+on every game start, and reloads each on every game server without a restart.
 
 The server side is `devtools/zones/fixtures/agent_fixture.java`
 (`script.fixture.agent_fixture`), installed by the same fixture overlay as
@@ -444,31 +445,50 @@ console, on the game server the existing bot query reports for that bot, and fai
 the step on any status other than `ok` or on an `expect` mismatch. The run plan lists
 the mutating operations a suite uses under `agent_fixture_changes`.
 
-| Operation | Arguments | Changes state |
-|---|---|---|
-| `inspect` | - | no |
-| `nearby` | radius | no |
-| `cells` | oid | no |
-| `contents` | oid | no |
-| `describe` | oid | no |
-| `items` | - | no |
-| `structure` | oid | no |
-| `countIn` | oid | no |
-| `tryPut` | oid, oid | yes |
-| `place` | oid, cell, coord, coord, coord, yaw | yes |
-| `warp` | coord, coord, coord | yes |
-| `moveInto` | oid, oid, cell, coord, coord, coord | yes |
-| `transform` | oid, coord, coord, yaw | yes |
-| `setDown` | oid, cell, coord, coord, coord, oids | yes |
-| `scale` | oid, scale | yes |
-| `grantExpertise` | trees (optional) | yes |
-| `grantSkills` | regex | yes |
-| `grantSchematics` | - | yes |
-| `itemBonuses` | oid, mods | yes |
-| `giveStatic` | names | yes |
-| `give` | oid | yes |
-| `completeCollection` | name | yes |
-| `clearDecor` | oid, tag | yes |
+Op families extend the fixture with more classes of the same shape, one Python module in
+`swg_test_studio/fixture_ops/` and one Java class `devtools/zones/fixtures/agent_<family>.java`
+each (see `docs/fixture-core.md`). Studio merges them into one op table and sends each op
+to its own class. An op that names another bot takes that bot's **role** as an argument;
+Studio replaces it with the role's registered identity, and refuses the acting role itself
+or a role the test does not declare. Ops that create world state need a `scenario` id on
+the step; everything they create is tagged with it, and the scenario family's
+`scenarioEnd` destroys it again. The plan lists the ids under `agent_fixture_scenarios`
+and whether each is ended in the suite. After a failed run, clean up with
+`python3 swg-tests.py scenario-end --environment environment.json --role actor --id my_scenario`.
+After an op that moves the bot to another scene, Studio waits (at most 90 s) until the bot
+query finds the bot again before the next step.
+
+The table below is generated from the merged op table. After adding or changing a family,
+run `python3 -m swg_test_studio.agent_fixture refresh`; it also refreshes the bundled-tool
+hashes of every `agent_*.java` (`--check` only reports what is stale).
+
+<!-- agent-fixture-ops:begin (generated: python3 -m swg_test_studio.agent_fixture refresh) -->
+| Operation | Fixture class | Arguments | Changes state | Scenario id |
+|---|---|---|---|---|
+| `inspect` | `agent_fixture` | - | no | - |
+| `nearby` | `agent_fixture` | radius | no | - |
+| `cells` | `agent_fixture` | oid | no | - |
+| `contents` | `agent_fixture` | oid | no | - |
+| `describe` | `agent_fixture` | oid | no | - |
+| `items` | `agent_fixture` | - | no | - |
+| `structure` | `agent_fixture` | oid | no | - |
+| `countIn` | `agent_fixture` | oid | no | - |
+| `tryPut` | `agent_fixture` | oid, oid | yes | - |
+| `place` | `agent_fixture` | oid, cell, coord, coord, coord, yaw | yes | - |
+| `warp` | `agent_fixture` | coord, coord, coord | yes | - |
+| `moveInto` | `agent_fixture` | oid, oid, cell, coord, coord, coord | yes | - |
+| `transform` | `agent_fixture` | oid, coord, coord, yaw | yes | - |
+| `setDown` | `agent_fixture` | oid, cell, coord, coord, coord, oids | yes | - |
+| `scale` | `agent_fixture` | oid, scale | yes | - |
+| `grantExpertise` | `agent_fixture` | trees (optional) | yes | - |
+| `grantSkills` | `agent_fixture` | regex | yes | - |
+| `grantSchematics` | `agent_fixture` | - | yes | - |
+| `itemBonuses` | `agent_fixture` | oid, mods | yes | - |
+| `giveStatic` | `agent_fixture` | names | yes | - |
+| `give` | `agent_fixture` | oid | yes | - |
+| `completeCollection` | `agent_fixture` | name | yes | - |
+| `clearDecor` | `agent_fixture` | oid, tag | yes | - |
+<!-- agent-fixture-ops:end -->
 
 ## Verify and coverage limits
 

@@ -94,6 +94,11 @@ def main(argv=None):
     child = commands.add_parser("install-agent-fixture",
                                 help="Compile and load the arrange/inspect fixture into an isolated test server")
     child.add_argument("--environment", type=Path, required=True)
+    child = commands.add_parser("scenario-end",
+                                help="Destroy what fixture ops created for one scenario id (cleanup after a failed run)")
+    child.add_argument("--environment", type=Path, required=True)
+    child.add_argument("--role", required=True, help="The role whose bot opened the scenario")
+    child.add_argument("--id", required=True, help="Scenario id")
     child = commands.add_parser("record-start")
     target = child.add_mutually_exclusive_group()
     target.add_argument("--environment", type=Path)
@@ -114,7 +119,8 @@ def main(argv=None):
         launch(args.workspace, args.collection)
         return 0
     linux_commands = ("run", "run-selected", "plan-batch", "run-batch", "select-source", "test-servers",
-                      "register-test-server", "docker-check", "install-agent-fixture")
+                      "register-test-server", "docker-check", "install-agent-fixture",
+                      "scenario-end")
     if os.name == "nt" and (args.command in linux_commands or args.command.startswith("record-") or
                             args.command == "plan" and not args.environment):
         try:
@@ -149,6 +155,14 @@ def main(argv=None):
         elif args.command == "install-agent-fixture":
             from .agent_fixture import install
             install(environment(args.environment), emit)
+        elif args.command == "scenario-end":
+            from .agent_fixture import scenario_end
+            from .backend import studio_lock
+            env = environment(args.environment)
+            with studio_lock(args.workspace):
+                artifact = scenario_end(env, args.role, args.id)
+            emit({"event": "scenario_ended", "role": args.role, "scenario": args.id,
+                  "fields": artifact["reply"]["fields"]})
         elif args.command == "environment-template":
             emit(environment_template())
         elif args.command in ("select-source", "test-servers"):
