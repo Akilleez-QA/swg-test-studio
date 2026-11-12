@@ -147,7 +147,8 @@ def console_text(project, bot, command, worker, profile):
                     command, str(worker), bot['player'], bot['station'], bot['character']], timeout=12)
     import restoration_console
     line = restoration_console.line(command, worker, bot)
-    host = restoration_console.central_address(json.loads(run(['docker', 'inspect', project + '-central-1'])))
+    inspect = lambda name: json.loads(run(['docker', 'inspect', name]))
+    host = restoration_console.central_address(inspect(project + '-central-1'), inspect)
     try:
         return restoration_console.request(host, line, timeout=12)
     except OSError as exc:

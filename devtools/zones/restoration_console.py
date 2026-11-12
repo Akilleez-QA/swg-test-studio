@@ -53,9 +53,27 @@ def private_address(host):
     return str(address)
 
 
-def central_address(rows):
-    """The one private address of an inspected central container."""
-    addresses = [n['IPAddress'] for n in rows[0]['NetworkSettings']['Networks'].values() if n.get('IPAddress')]
+def network_owner(row, inspect):
+    """The container whose network namespace `row` joins (Compose network_mode service:X), or `row` itself.
+
+    CentralServer reaches its TaskManager only at 127.0.0.1, so a fixture may run Central in the
+    TaskManager container's namespace; its console then listens on that container's address. The
+    owner must belong to the same Compose project.
+    """
+    mode = row.get('HostConfig', {}).get('NetworkMode', '')
+    if not mode.startswith('container:'):
+        return row
+    owner = inspect(mode[len('container:'):])[0]
+    project = row['Config']['Labels'].get('com.docker.compose.project')
+    if not project or owner['Config']['Labels'].get('com.docker.compose.project') != project:
+        raise RuntimeError('Central shares the network of a container outside its fixture project')
+    return owner
+
+
+def central_address(rows, inspect=None):
+    """The one private address of an inspected central container (or of the container whose network it joins)."""
+    row = network_owner(rows[0], inspect) if inspect else rows[0]
+    addresses = [n['IPAddress'] for n in row['NetworkSettings']['Networks'].values() if n.get('IPAddress')]
     if len(addresses) != 1:
         raise RuntimeError('Cannot select one central fixture address')
     return private_address(addresses[0])

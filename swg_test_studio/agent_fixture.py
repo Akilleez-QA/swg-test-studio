@@ -535,6 +535,15 @@ def check(reply, expect, accept=("ok",)):
 def central_host(project, inspect):
     """The central container's address on the fixture network (private by construction)."""
     rows = inspect(project + "-central-1")
+    mode = rows[0].get("HostConfig", {}).get("NetworkMode", "")
+    if mode.startswith("container:"):
+        # Central in its TaskManager's network namespace (network_mode service:X): same project only.
+        owner = inspect(mode[len("container:"):])
+        label = "com.docker.compose.project"
+        if not rows[0]["Config"]["Labels"].get(label) or owner[0]["Config"]["Labels"].get(label) != \
+                rows[0]["Config"]["Labels"].get(label):
+            raise RuntimeError("Central shares the network of a container outside its fixture project")
+        rows = owner
     networks = rows[0]["NetworkSettings"]["Networks"]
     addresses = [n["IPAddress"] for n in networks.values() if n.get("IPAddress")]
     if len(addresses) != 1:

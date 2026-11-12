@@ -326,6 +326,28 @@ class RestorationRuntimeTests(unittest.TestCase):
             with self.subTest(host=host), self.assertRaises(ValueError):
                 restoration_console.private_address(host)
 
+    def test_central_in_a_shared_namespace_uses_its_owner_address(self):
+        def row(project, mode="", addresses=()):
+            return {"Config": {"Labels": {"com.docker.compose.project": project}}, "HostConfig": {"NetworkMode": mode},
+                    "NetworkSettings": {"Networks": {f"n{i}": {"IPAddress": a} for i, a in enumerate(addresses)}}}
+
+        project = "swg-cold-test-0123abcd"
+        central = [row(project, "container:abc")]
+        owner = [row(project, "", ["172.21.0.5"])]
+        self.assertEqual(restoration_console.central_address(central, lambda name: owner), "172.21.0.5")
+        self.assertEqual(agent_fixture.central_host(
+            project, lambda name: central if name.endswith("central-1") else owner), "172.21.0.5")
+        # Without an inspector, with an owner in another project, or with a public owner address: refused.
+        with self.assertRaises(RuntimeError):
+            restoration_console.central_address(central)
+        with self.assertRaises(RuntimeError):
+            restoration_console.central_address(central, lambda name: [row("other", "", ["172.21.0.5"])])
+        with self.assertRaises(RuntimeError):
+            agent_fixture.central_host(project, lambda name: central if name.endswith("central-1")
+                                       else [row("other", "", ["172.21.0.5"])])
+        with self.assertRaises(ValueError):
+            restoration_console.central_address(central, lambda name: [row(project, "", ["8.8.8.8"])])
+
     def test_console_request_reads_one_reply_after_a_keepalive(self):
         reply = agent_fixture.pack("protocol_bot=absent\n")
 
