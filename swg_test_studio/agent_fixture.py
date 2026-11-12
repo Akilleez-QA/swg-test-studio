@@ -29,6 +29,7 @@ import re
 import socket
 import struct
 import time
+from types import MappingProxyType
 
 FIXTURE = "agent_fixture"
 SCRIPT = "fixture." + FIXTURE
@@ -37,7 +38,9 @@ CONSOLE_PORT = 61000
 _NUMBER = r"-?[0-9]{1,5}(\.[0-9]{1,6})?"  # the fixture's NUM_RE
 ROLE_KIND, ROLE_RE = "role", r"[a-z][a-z0-9_]{0,31}"
 SCENARIO_KIND, SCENARIO_RE = "scenario", r"[a-z][a-z0-9_]{0,31}"
-CORE_TYPES = {
+# The core tables are read-only, and Registry copies a snapshot taken here, before any family
+# module is imported: a family can neither edit nor rebind the core kinds, ranges or ops.
+CORE_TYPES = MappingProxyType({
     "oid": r"[1-9][0-9]{0,18}",
     "oids": r"[1-9][0-9]{0,18}(,[1-9][0-9]{0,18}){0,31}",
     "coord": _NUMBER,
@@ -54,13 +57,13 @@ CORE_TYPES = {
     # Shared kinds of the op families (sources/interface.md): a family may reuse them only verbatim.
     ROLE_KIND: ROLE_RE,
     SCENARIO_KIND: SCENARIO_RE,
-}
+})
 
 # Numeric limits the fixture enforces (agent_fixture.java); checked here so a bad step fails at validation.
-CORE_RANGES = {"yaw": (-360.0, 360.0), "scale": (0.05, 20.0), "radius": (0.0, 128.0)}
+CORE_RANGES = MappingProxyType({"yaw": (-360.0, 360.0), "scale": (0.05, 20.0), "radius": (0.0, 128.0)})
 
 # name -> (argument types, mutates). Optional trailing arguments are written "type?".
-CORE_OPS = {
+CORE_OPS = MappingProxyType({
     "inspect": ((), False),
     "nearby": (("radius",), False),
     "cells": (("oid",), False),
@@ -84,17 +87,22 @@ CORE_OPS = {
     "give": (("oid",), True),
     "completeCollection": (("name",), True),
     "clearDecor": (("oid", "tag"), True),
-}
+})
+_CORE = (dict(CORE_TYPES), dict(CORE_RANGES), dict(CORE_OPS))
 
 IDENTITY = re.compile(r"[1-9][0-9]{0,18}:[1-9][0-9]{0,9}:Cap[a-z]{12}")
-# Every argument, whatever its family regex, must be one bounded printable ASCII token:
-# no whitespace (it would split the console line) and no control bytes.
-TOKEN = re.compile(r"[\x21-\x7e]{1,512}")
+# Every argument, whatever its family regex, must be one bounded token of this fixed safe class
+# (the union of what the core and family kinds need): no whitespace (it would split the console
+# line), no control bytes, no quotes, backslash, semicolon, backtick, '&', '<', '>', '#', '%',
+# '!', '@', '~', '{' or '}'.
+TOKEN = re.compile(r"[A-Za-z0-9_.,:/*^$|()\[\]+?=-]{1,512}")
 
 # --- Op families --------------------------------------------------------------------------
 
 FAMILY_PACKAGE = __package__ + ".fixture_ops"
-FAMILY_NAME = re.compile(r"[a-z][a-z0-9_]{0,23}")
+# One family-name rule for discovery, the Java source name and the reload line: letters and '_'.
+FAMILY_RE = r"[a-z][a-z_]{0,23}"
+FAMILY_NAME = re.compile(FAMILY_RE)
 OP_NAME = re.compile(r"[a-z][A-Za-z0-9]{0,31}")
 KIND_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}")
 FAMILY_NAMES = frozenset({"FIXTURE", "TYPES", "RANGES", "OPS", "ROLE_ARGS", "check", "SCENARIO_OPS",
@@ -110,10 +118,11 @@ class Registry:
     """The merged, validated op table: core ops plus every family's ops."""
 
     def __init__(self):
-        self.types = dict(CORE_TYPES)
-        self.ranges = dict(CORE_RANGES)
-        self.ops = dict(CORE_OPS)
-        self.fixture_of = {op: FIXTURE for op in CORE_OPS}
+        types, ranges, ops = _CORE
+        self.types = dict(types)
+        self.ranges = dict(ranges)
+        self.ops = dict(ops)
+        self.fixture_of = {op: FIXTURE for op in ops}
         self.role_args = {}
         self.scenario_ops = set()
         self.scene_changing = set()
@@ -172,6 +181,8 @@ def _family(name, module, registry):
             bad(f"range for {kind!r} must be (low, high) on a declared kind")
         if kind in ranges_after and tuple(ranges_after[kind]) != tuple(bounds):
             bad(f"range for {kind!r} redefined with different bounds")
+        if kind in _CORE[0] and kind not in _CORE[1]:
+            bad(f"range for core kind {kind!r}: a family may not bound a core kind")
         ranges_after[kind] = bounds
     for op, entry in ops.items():
         if not isinstance(op, str) or not OP_NAME.fullmatch(op):
@@ -285,10 +296,13 @@ def arguments(op, args, registry=None):
     required = [t for t in spec if not t.endswith("?")]
     if not len(required) <= len(args) <= len(spec):
         raise ValueError(f"{op} takes {len(required)}-{len(spec)} arguments")
-    for kind, value in zip(spec, args):
+    roles = registry.role_args.get(op, ())
+    for index, (kind, value) in enumerate(zip(spec, args)):
         kind = kind.rstrip("?")
         if not TOKEN.fullmatch(value) or not re.fullmatch(registry.types[kind], value):
             raise ValueError(f"{op}: invalid {kind} argument")
+        if index not in roles and IDENTITY.search(value):
+            raise ValueError(f"{op}: a bot identity may only arrive through a role argument")
         low, high = registry.ranges.get(kind, (None, None))
         if low is not None and not low <= float(value) <= high:
             raise ValueError(f"{op}: {kind} must be within {low}..{high}")
@@ -336,23 +350,55 @@ def command(worker, bot, op, args, *, scenario=None, identities=None, registry=N
 
 
 def scenario_ids(steps, registry=None):
-    """Scenario bookkeeping of a suite's agent_fixture steps (plan): id -> begun/ended/used."""
-    registry = registry or REGISTRY
-    found = {}
+    """Scenario bookkeeping of a suite's agent_fixture steps (plan), in step order.
 
-    def entry(name):
-        return found.setdefault(name, {"id": name, "begun": [], "ended": [], "used": []})
+    One row per (role, scenario id): `begun`, `ended`, `used` (step ids) and `problems`, where
+    each problem is "<step>: <kind>" for end-before-begin, use-without-begin, ended-by-other-role
+    (another role has that id open; the Java side ends only the acting bot's scenario),
+    begun-twice, begin-while-other-open, scene-change-while-open (a SCENE_CHANGING op of a role
+    with a scenario open) or never-ended.
+    """
+    registry = registry or REGISTRY
+    found, open_of, opened_by = {}, {}, {}  # (role, id) -> row; role -> the id it has open, and the step
+
+    def entry(role, name):
+        return found.setdefault((role, name), {"id": name, "role": role, "begun": [], "ended": [], "used": [],
+                                               "problems": []})
 
     for step in steps:
         options = step.get("options", {})
-        op = options.get("op")
+        op, role = options.get("op"), options.get("role")
         if op in (SCENARIO_BEGIN, SCENARIO_END):
             name = options.get("scenario") if op in registry.scenario_ops else (options.get("args") or [None])[0]
-            if name:
-                entry(name)["begun" if op == SCENARIO_BEGIN else "ended"].append(step["id"])
+            if not name:
+                continue
+            row = entry(role, name)
+            if op == SCENARIO_BEGIN:
+                row["begun"].append(step["id"])
+                if open_of.get(role) == name:
+                    row["problems"].append(step["id"] + ": begun-twice")
+                elif open_of.get(role):
+                    row["problems"].append(step["id"] + ": begin-while-other-open")
+                else:
+                    open_of[role], opened_by[role] = name, step["id"]
+            else:
+                row["ended"].append(step["id"])
+                if open_of.get(role) == name:
+                    del open_of[role]
+                elif any(other != role and opened == name for other, opened in open_of.items()):
+                    row["problems"].append(step["id"] + ": ended-by-other-role")
+                else:
+                    row["problems"].append(step["id"] + ": end-before-begin")
         elif options.get("scenario"):
-            entry(options["scenario"])["used"].append(step["id"])
-    return sorted(found.values(), key=lambda row: row["id"])
+            row = entry(role, options["scenario"])
+            row["used"].append(step["id"])
+            if open_of.get(role) != options["scenario"]:
+                row["problems"].append(step["id"] + ": use-without-begin")
+        if op in registry.scene_changing and open_of.get(role):
+            entry(role, open_of[role])["problems"].append(step["id"] + ": scene-change-while-open")
+    for role, name in open_of.items():
+        found[(role, name)]["problems"].append(opened_by[role] + ": never-ended")
+    return sorted(found.values(), key=lambda row: (row["id"], row["role"] or ""))
 
 
 def scenario_end_options(role, scenario, registry=None):
@@ -468,13 +514,17 @@ def parse(text, fixture=None, registry=None):
             continue
         if key == "row":
             rows.append(value)
+        elif key in fields:  # never last-key-wins: an ambiguous reply satisfies no expectation
+            return {"fixture": prefix, "status": "malformed", "fields": {}, "rows": [],
+                    "error": "duplicate reply key " + key[:64], "raw": text[:500]}
         else:
             fields[key] = value
     return {"fixture": prefix, "status": tokens[0].split("=", 1)[1], "fields": fields, "rows": rows}
 
 
-def check(reply, expect):
-    if reply["status"] != "ok":
+def check(reply, expect, accept=("ok",)):
+    """None when the reply's status is one of `accept` and every expected field matches."""
+    if reply["status"] not in accept:
         return f"fixture status {reply['status']}"
     for key, value in (expect or {}).items():
         if reply["fields"].get(key) != value:
@@ -524,11 +574,12 @@ def _registered_bot(driver, folder, key):
     return driver.identity(json.loads((folder / "protocol-driver" / (key + ".json")).read_text()))
 
 
-def run_live(options, env, registry, bindings=None):
+def run_live(options, env, registry, bindings=None, *, accept=("ok",)):
     """Execute one agent_fixture step against the registered bot; returns an artifact dict.
 
     `registry` is the acting role's registry key; `bindings` maps every role of the run to its
-    registry key (needed for ops that name another role's bot).
+    registry key (needed for ops that name another role's bot). A reply status outside `accept`
+    fails the step.
     """
     import json
     import subprocess
@@ -560,7 +611,7 @@ def run_live(options, env, registry, bindings=None):
     fixture = REGISTRY.fixture_of[op]
     reply = parse(send(central_host(project, inspect), line), fixture)
     print("AGENT_FIXTURE", fixture, op, reply["status"], json.dumps(reply["fields"], sort_keys=True), flush=True)
-    failure = check(reply, options.get("expect"))
+    failure = check(reply, options.get("expect"), accept)
     if failure:
         raise RuntimeError(f"{fixture} {op}: {failure}")
     artifact = {"fixture": fixture, "op": op, "mutates": OPS[op][1], "reply": reply}
@@ -575,18 +626,36 @@ def run_live(options, env, registry, bindings=None):
 
 
 def scenario_end(env, role, scenario):
-    """Clean up one scenario after a failed run: scenarioEnd for the role's bot."""
+    """Clean up one scenario after a failed run: scenarioEnd for the role's bot.
+
+    Works only while that bot is logged in, on the game server of the scene the scenario was
+    opened in, and within reach of what it created (docs/fixture-scenario.md). A `partial` reply
+    is returned, not raised, so the caller can report what leaked (scenario_end_failure).
+    """
     bindings = env["bindings"]
     if role not in bindings:
         raise ValueError("The environment binds no registry to role " + str(role))
-    return run_live(scenario_end_options(role, scenario), env, bindings[role], bindings)
+    return run_live(scenario_end_options(role, scenario), env, bindings[role], bindings, accept=("ok", "partial"))
+
+
+def scenario_end_failure(reply):
+    """Why a scenarioEnd reply is not a clean end (None when it is): partial, leaked or nothing open."""
+    fields = reply.get("fields", {})
+    if reply.get("status") != "ok":
+        return f"scenarioEnd status {reply.get('status')}: leaked={fields.get('leaked', '?')} " \
+               f"leaked_ids={fields.get('leaked_ids', '?')} open={fields.get('open', '?')}"
+    if fields.get("leaked") != "0":
+        return f"scenarioEnd left leaked={fields.get('leaked', '?')} objects"
+    if fields.get("was_open") != "true":
+        return "No scenario with this id was open on the bot (was_open=false); check the id and role"
+    return None
 
 
 # --- Installation into an isolated fixture --------------------------------------------------
 
 RUNTIME_SCRIPTS = "/opt/whitengold/data/sku.0/sys.server/compiled/game/script"
 RELEASE = {52: "8", 55: "11", 61: "17", 65: "21"}
-FIXTURE_SOURCE = re.compile(r"agent_[a-z][a-z0-9_]{0,23}\.java")
+FIXTURE_SOURCE = re.compile(r"agent_" + FAMILY_RE + r"\.java")
 
 
 def reload_command(worker, script=SCRIPT):

@@ -308,8 +308,10 @@ class ScenarioTests(unittest.TestCase):
                  fixture_step("put2", op="spawn", args=["object/x.iff", "1", "2"], scenario="s2"),
                  fixture_step("close", op="scenarioEnd", args=["s1"])]
         rows = af.scenario_ids(steps, self.reg)
-        self.assertEqual(rows, [{"id": "s1", "begun": ["open"], "ended": ["close"], "used": ["put"]},
-                                {"id": "s2", "begun": [], "ended": [], "used": ["put2"]}])
+        self.assertEqual(rows, [{"id": "s1", "role": "actor", "begun": ["open"], "ended": ["close"], "used": ["put"],
+                                 "problems": []},
+                                {"id": "s2", "role": "actor", "begun": [], "ended": [], "used": ["put2"],
+                                 "problems": ["put2: use-without-begin"]}])
 
     def test_plan_reports_scenarios_classes_and_partners(self):
         steps = [fixture_step("open", op="scenarioBegin", args=["s1"]),
@@ -343,34 +345,329 @@ class ScenarioTests(unittest.TestCase):
         return code, [json.loads(line) for line in out.getvalue().splitlines()]
 
     def test_cli_scenario_end(self):
+        """scenario-end: exit 0 only for a clean end; the studio lock; the role must be bound."""
         with tempfile.TemporaryDirectory() as folder:
             env_file = Path(folder) / "environment.json"
             env = {"schema_version": 1, "name": "Offline", "server_checkout": "/srv/checkout",
                    "folder": "/tmp/swg-cold-test-0123abcd/client-012345abcdef", "binary": "/tmp/driver",
                    "bindings": {"actor": "tester", "member": "helper"}}
             env_file.write_text(json.dumps(env))
-            argv = ["--workspace", str(Path(folder) / "ws"), "scenario-end", "--environment", str(env_file),
+            workspace = Path(folder) / "ws"
+            argv = ["--workspace", str(workspace), "scenario-end", "--environment", str(env_file),
                     "--role", "actor", "--id", "s1"]
-            calls = []
+            calls, replies = [], []
 
-            def fake_run(options, env_, key, bindings):
-                calls.append((options, key, bindings))
-                return {"reply": {"fields": {"destroyed": "3"}}}
+            def fake_run(options, env_, key, bindings, accept=("ok",)):
+                calls.append((options, key, bindings, accept))
+                return {"reply": replies.pop(0)}
 
+            clean = {"status": "ok", "fields": {"destroyed": "3", "leaked": "0", "was_open": "true"}}
             with mock.patch.object(af, "REGISTRY", self.reg), mock.patch.object(af, "run_live", fake_run):
+                replies[:] = [clean]
                 code, events = self.run_cli(argv)
                 self.assertEqual(code, 0)
                 self.assertEqual(events[-1], {"event": "scenario_ended", "role": "actor", "scenario": "s1",
-                                              "fields": {"destroyed": "3"}})
+                                              "status": "ok", "fields": clean["fields"]})
+                # A partial reply is returned to the CLI (not raised) so it can report the leak.
                 self.assertEqual(calls, [({"role": "actor", "op": "scenarioEnd", "args": ["s1"]}, "tester",
-                                          {"actor": "tester", "member": "helper"})])
+                                          {"actor": "tester", "member": "helper"}, ("ok", "partial"))])
+                # A mistyped id: nothing was open on the bot, so nothing was cleaned up.
+                replies[:] = [{"status": "ok", "fields": {"destroyed": "0", "leaked": "0", "was_open": "false"}}]
+                code, events = self.run_cli(argv)
+                self.assertEqual(code, 1)
+                self.assertIn("was_open=false", events[-1]["error"])
+                # Objects left out of reach: the scenario stays open and the command fails.
+                replies[:] = [{"status": "partial", "fields": {"destroyed": "1", "leaked": "2", "leaked_ids": "5,6",
+                                                               "was_open": "true", "open": "s1"}}]
+                code, events = self.run_cli(argv)
+                self.assertEqual(code, 1)
+                self.assertIn("leaked=2", events[-1]["error"])
+                self.assertEqual(events[-1]["fields"]["leaked_ids"], "5,6")
+                replies[:] = [{"status": "ok", "fields": {"destroyed": "0", "leaked": "1", "was_open": "true"}}]
+                self.assertEqual(self.run_cli(argv)[0], 1)
+                # An unbound role is refused by scenario_end itself, before anything is sent.
+                sent = len(calls)
                 code, events = self.run_cli(argv[:-4] + ["--role", "ghost", "--id", "s1"])
                 self.assertEqual(code, 1)
+                self.assertIn("binds no registry to role ghost", events[-1]["error"])
+                # Another Studio operation holds the lock: refused, nothing sent.
+                from swg_test_studio.backend import studio_lock
+                replies[:] = [clean]
+                with studio_lock(workspace):
+                    code, events = self.run_cli(argv)
+                self.assertEqual(code, 1)
+                self.assertEqual(len(calls), sent)
             # Without a scenario family the command refuses before anything is sent.
             with mock.patch.object(af, "REGISTRY", af.merge([])):
                 code, events = self.run_cli(argv)
             self.assertEqual(code, 1)
             self.assertIn("scenarioEnd", events[-1]["error"])
+
+    def test_scenario_end_refuses_an_unbound_role(self):
+        with mock.patch.object(af, "run_live", lambda *a, **k: self.fail("nothing may be sent")):
+            with self.assertRaisesRegex(ValueError, "binds no registry to role ghost"):
+                af.scenario_end({"bindings": {"actor": "tester"}}, "ghost", "s1")
+
+    def test_scenario_end_failure(self):
+        self.assertIsNone(af.scenario_end_failure({"status": "ok", "fields": {"leaked": "0", "was_open": "true"}}))
+        for reply, text in (({"status": "partial", "fields": {"leaked": "2", "was_open": "true"}}, "leaked=2"),
+                            ({"status": "refused", "fields": {"failed": "1"}}, "status refused"),
+                            ({"status": "ok", "fields": {"leaked": "1", "was_open": "true"}}, "leaked=1"),
+                            ({"status": "ok", "fields": {"leaked": "0", "was_open": "false"}}, "was_open=false")):
+            with self.subTest(reply=reply):
+                self.assertIn(text, af.scenario_end_failure(reply))
+
+    def test_plan_flags_every_ordering_problem(self):
+        roles = ("actor", "member")
+
+        def step(step_id, role, op, args, scenario=None):
+            return fixture_step(step_id, role=role, op=op, args=args, **({"scenario": scenario} if scenario else {}))
+
+        spawn = ["object/x.iff", "1", "2"]
+        steps = [step("early_end", "actor", "scenarioEnd", ["s0"]),
+                 step("early_use", "actor", "spawn", spawn, "s1"),
+                 step("open", "actor", "scenarioBegin", ["s1"]),
+                 step("again", "actor", "scenarioBegin", ["s1"]),
+                 step("other", "actor", "scenarioBegin", ["s2"]),
+                 step("use", "actor", "spawn", spawn, "s1"),
+                 step("away", "actor", "warpScene", ["naboo", "1", "2", "3"]),
+                 step("member_use", "member", "spawn", spawn, "s1"),
+                 step("member_end", "member", "scenarioEnd", ["s1"]),
+                 step("m_open", "member", "scenarioBegin", ["m1"]),
+                 step("m_close", "member", "scenarioEnd", ["m1"]),
+                 step("m_away", "member", "warpScene", ["naboo", "1", "2", "3"]),
+                 step("s0_open", "actor", "scenarioBegin", ["s0"])]
+        rows = {(r["id"], r["role"]): r for r in af.scenario_ids(steps, self.reg)}
+        self.assertEqual(rows[("s0", "actor")]["problems"], ["early_end: end-before-begin",
+                                                             "s0_open: begin-while-other-open"])
+        self.assertEqual(rows[("s1", "actor")]["problems"],
+                         ["early_use: use-without-begin", "again: begun-twice", "away: scene-change-while-open",
+                          "open: never-ended"])
+        self.assertEqual(rows[("s2", "actor")]["problems"], ["other: begin-while-other-open"])
+        self.assertEqual(rows[("s1", "member")]["problems"], ["member_use: use-without-begin",
+                                                              "member_end: ended-by-other-role"])
+        self.assertEqual(rows[("m1", "member")]["problems"], [])  # m_away is after m_close
+        self.assertEqual(rows[("s1", "actor")]["used"], ["early_use", "use"])
+        # Existing plan keys stay: id, begun, ended, used.
+        self.assertTrue(all({"id", "begun", "ended", "used"} <= set(r) for r in rows.values()))
+        # Seeded fault: the same steps in a correct order raise no problem.
+        good = [step("open", "actor", "scenarioBegin", ["s1"]), step("use", "actor", "spawn", spawn, "s1"),
+                step("close", "actor", "scenarioEnd", ["s1"]), step("away", "actor", "warpScene", ["naboo", "1", "2", "3"])]
+        self.assertEqual([r["problems"] for r in af.scenario_ids(good, self.reg)], [[]])
+        with mock.patch.object(af, "REGISTRY", self.reg), mock.patch.object(backend, "AGENT_REGISTRY", self.reg), \
+                mock.patch.dict(backend.AGENT_OPS, self.reg.ops):
+            env = {"bindings": {"actor": "tester", "member": "helper"}, "server_checkout": "/nonexistent",
+                   "name": "Offline"}
+            plan_rows = backend.plan(suite(steps, roles), env)["effects"]["agent_fixture_scenarios"]
+        self.assertIn("away: scene-change-while-open",
+                      next(r for r in plan_rows if r["id"] == "s1" and r["role"] == "actor")["problems"])
+
+
+class ArgumentClassTests(unittest.TestCase):
+    """The dispatcher's own argument rules, whatever a family's kind regex allows."""
+
+    def loose(self):
+        return af.merge([family("aaa", TYPES={"text": r".{1,40}"}, OPS={"say": (("text",), True),
+                                                                        "meet": (("role", "text"), True)},
+                               ROLE_ARGS={"meet": (0,)})])
+
+    def test_fixed_safe_character_class(self):
+        reg = self.loose()
+        for value in ("hello", "a=b,c:d/e", "-1.5", "x_y.z*", "^a|b$", "(a)[b]+?"):
+            with self.subTest(value=value):
+                self.assertTrue(af.command(1, BOT, "say", [value], registry=reg).endswith(" " + value))
+        for value in ("a;b", "a'b", 'a"b', "a`b", "a&b", "a\\b", "a<b", "a>b", "a#b", "a%b", "a!b", "a@b", "a{b}",
+                      "a~b", "a b", "caf\u00e9"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                af.command(1, BOT, "say", [value], registry=reg)
+        # Seeded fault: the old printable-ASCII token would let these through.
+        self.assertTrue(re.fullmatch(r"[\x21-\x7e]{1,512}", "a;b"))
+
+    def test_an_identity_only_arrives_through_a_role_argument(self):
+        reg = self.loose()
+        for value in (IDENT, "x" + IDENT, IDENT + ",1"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                af.arguments("say", [value], reg)
+        with self.assertRaises(ValueError):
+            af.arguments("meet", ["member", IDENT], reg)
+        line = af.command(1, BOT, "meet", ["member", "hi"], identities={"member": OTHER}, registry=reg)
+        self.assertTrue(line.endswith(" 223456789:4343:Capmnopqrstuvwx hi"))
+        # The real scenario family: a test objvar value shaped like an identity is refused.
+        if "setTestVar" in af.OPS:
+            with self.assertRaises(ValueError):
+                af.arguments("setTestVar", ["self", "x", "string", IDENT])
+
+
+class RegistryTests(unittest.TestCase):
+    def test_core_tables_are_read_only_and_snapshotted(self):
+        for table in (af.CORE_TYPES, af.CORE_RANGES, af.CORE_OPS):
+            with self.assertRaises(TypeError):
+                table["oid"] = "x"
+        # A family module that rebinds the core names at import changes nothing in a merge.
+        with mock.patch.object(af, "CORE_TYPES", {"oid": r".*"}), mock.patch.object(af, "CORE_OPS", {}):
+            core = af.merge([])
+        self.assertEqual(core.types["oid"], r"[1-9][0-9]{0,18}")
+        self.assertIn("warp", core.ops)
+
+    def test_a_family_may_not_bound_a_core_kind(self):
+        for kind in ("coord", "oid", "role", "scenario"):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                af.merge([family("aaa", RANGES={kind: (0, 1)})])
+        # Identical reuse of a core range stays allowed.
+        af.merge([family("aaa", RANGES={"yaw": (-360.0, 360.0)})])
+
+    def test_one_family_name_rule_for_install_and_reload(self):
+        for name in ("a", "x_y", "a" * 24, "multi"):
+            with self.subTest(name=name):
+                self.assertTrue(af.FAMILY_NAME.fullmatch(name))
+                self.assertTrue(af.FIXTURE_SOURCE.fullmatch(f"agent_{name}.java"))
+                self.assertEqual(af.reload_command(2, f"fixture.agent_{name}"), f"game 2 reloadScript fixture.agent_{name}")
+        for name in ("a1", "x2y", "A", "_a", "a" * 25):
+            with self.subTest(name=name):
+                self.assertFalse(af.FAMILY_NAME.fullmatch(name))
+                self.assertFalse(af.FIXTURE_SOURCE.fullmatch(f"agent_{name}.java"))
+                with self.assertRaises(ValueError):
+                    af.merge([family(name)])
+
+
+class ReplyTests(unittest.TestCase):
+    def test_a_duplicate_key_is_never_last_key_wins(self):
+        reply = af.parse("agent_fixture=ok count=1 count=2")
+        self.assertEqual(reply["status"], "malformed")
+        self.assertEqual(af.check(reply, {"count": "2"}), "fixture status malformed")
+        # Rows repeat by design.
+        self.assertEqual(af.parse("agent_fixture=ok row=a row=b rows=2")["rows"], ["a", "b"])
+        self.assertIsNone(af.check(af.parse("agent_fixture=ok count=2"), {"count": "2"}))
+
+
+class RunnerMutantTests(unittest.TestCase):
+    """run_live, the registry key, the run report and the installer: each guard with its effect."""
+
+    class Driver:
+        REPO = None
+
+        @staticmethod
+        def fixture(folder):
+            return "proj", "WGC_0123456789AB", {"game": {"Id": "game1"}}
+
+        @staticmethod
+        def identity(value):
+            return value
+
+        @staticmethod
+        def bot_query(project, bot):
+            return {"worker": 3, "scene": "tatooine"}
+
+    def run_step(self, options, key="tester", bindings=None, reply="agent_scenario=ok"):
+        sent = []
+        bots = {"tester": BOT, "helper": OTHER}
+        reg = all_families()
+        with tempfile.TemporaryDirectory() as folder, \
+                mock.patch.object(af, "REGISTRY", reg), mock.patch.dict(af.OPS, reg.ops), \
+                mock.patch("swg_test_studio.backend.driver_modules", lambda env: (self.Driver, None)), \
+                mock.patch.object(af, "central_host", lambda project, inspect: "10.0.0.2"), \
+                mock.patch.object(Path, "read_text", lambda path: json.dumps(bots[path.stem])), \
+                mock.patch.object(af, "send", lambda host, line: sent.append(line) or reply), \
+                contextlib.redirect_stdout(io.StringIO()):
+            art = af.run_live(options, {"folder": folder}, key, bindings or {"actor": key})
+        return sent, art
+
+    def test_run_live_sends_the_scenario_id(self):
+        sent, art = self.run_step({"role": "actor", "op": "spawn", "args": ["object/x.iff", "1", "2"], "scenario": "s1"})
+        self.assertEqual(sent, [f"game 3 runScript fixture.agent_scenario spawn {IDENT} s1 object/x.iff 1 2"])
+        self.assertEqual(art["scenario"], "s1")
+
+    def test_run_live_refuses_an_acting_role_bound_elsewhere(self):
+        with self.assertRaisesRegex(ValueError, "bound to a different registry"):
+            self.run_step({"role": "actor", "op": "level", "args": []}, "tester", {"actor": "helper"})
+        sent, _ = self.run_step({"role": "actor", "op": "level", "args": []}, "tester", {"actor": "tester"},
+                                "agent_character=ok")
+        self.assertEqual(sent, [f"game 3 runScript fixture.agent_character level {IDENT}"])
+
+    def test_run_live_accepts_only_the_given_statuses(self):
+        options = {"role": "actor", "op": "scenarioEnd", "args": ["s1"]}
+        with self.assertRaisesRegex(RuntimeError, "fixture status partial"):
+            self.run_step(options, reply="agent_scenario=partial leaked=1")
+        reg = all_families()
+        with mock.patch.object(af, "run_live", lambda o, e, k, b, accept: (o, accept)):
+            self.assertEqual(af.scenario_end({"bindings": {"actor": "tester"}}, "actor", "s1")[1], ("ok", "partial"))
+        self.assertTrue(reg)
+
+    def test_registered_bot_key_is_checked_before_any_file_is_read(self):
+        driver = SimpleNamespace(identity=lambda value: value)
+        with tempfile.TemporaryDirectory() as folder:
+            registry = Path(folder) / "protocol-driver"
+            registry.mkdir()
+            (registry / "tester.json").write_text(json.dumps(BOT))
+            self.assertEqual(af._registered_bot(driver, Path(folder), "tester"), BOT)
+            (Path(folder) / "x.json").write_text(json.dumps(OTHER))
+            for key in ("../x", "Tester", "ab", "a" * 17, "tester.json", None, "te ster"):
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, "registry key"):
+                    af._registered_bot(driver, Path(folder), key)
+
+    def test_run_report_hashes_the_fixture_op_modules(self):
+        options = {"role": "actor", "op": "stats", "args": []}
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "tools" / "teststudio_server").mkdir(parents=True)
+            (root / "tools" / "teststudio_server" / "retained_peer.py").write_text("peer")
+            driver = SimpleNamespace(REPO=root / "repo")
+            legacy = SimpleNamespace(source_hashes=lambda: {})
+            selected = {"manifest": {"tests": [{"id": "look", "kind": "agent_fixture", "options": options}]},
+                        "bindings": {"actor": "tester"}}
+            with mock.patch.object(backend, "plan", lambda suite, env: selected), \
+                    mock.patch.object(backend, "driver_modules", lambda env: (driver, legacy)), \
+                    mock.patch.object(backend, "verified_tool_root", lambda: root / "tools"), \
+                    mock.patch.object(af, "run_live", lambda *a, **k: {"fixture": "agent_character"}):
+                result = backend.run_suite({"id": "probe"}, {"folder": str(root)}, root / "ws", emit=lambda e: None)
+            report = json.loads((Path(result["evidence"]) / "result.json").read_text())
+        self.assertTrue(report["passed"])
+        hashed = report["application_sha256"]
+        modules = sorted((ROOT / "swg_test_studio" / "fixture_ops").glob("*.py"))
+        self.assertTrue(modules)
+        for module in modules:
+            self.assertEqual(hashed["fixture_ops/" + module.name], hashlib.sha256(module.read_bytes()).hexdigest())
+
+    def install(self, class_files):
+        """install() with docker and javac replaced; javac writes class_files for each source."""
+        calls = []
+
+        def run(argv, capture_output, text, check, **kw):
+            calls.append(argv)
+            if argv[:2] == ["docker", "cp"] and argv[2].endswith("/."):
+                target = Path(argv[3]) / "fixture"
+                target.mkdir(parents=True)
+                (Path(argv[3]) / "base_script.class").write_bytes(b"\xca\xfe\xba\xbe\x00\x00\x00\x41")
+            elif argv[0] == "javac":
+                out = Path(argv[argv.index("-d") + 1]) / "script" / "fixture"
+                out.mkdir(parents=True)
+                for name in class_files(Path(argv[-1]).stem):
+                    (out / name).write_bytes(b"class")
+            elif argv[:2] == ["docker", "exec"]:
+                return SimpleNamespace(stdout="Adding server 3 for scene tatooine\n")
+            return SimpleNamespace(stdout="[]")
+
+        profile = SimpleNamespace(fixtures=(), runtime_scripts="/scripts", runtime_log="/log")
+        with tempfile.TemporaryDirectory() as folder:
+            tools = Path(folder) / "tools"
+            with mock.patch("swg_test_studio.backend.driver_modules", lambda env: (self.Driver, None)), \
+                    mock.patch("swg_test_studio.server_tools.profile_of", lambda env: profile), \
+                    mock.patch("swg_test_studio.server_tools.verified_tool_root", lambda: tools), \
+                    mock.patch("swg_test_studio.server_tools._bundle", SimpleNamespace(verify=lambda root: {})), \
+                    mock.patch.object(af, "fixture_sources", lambda *a: ["fixtures/agent_fixture.java"]), \
+                    mock.patch.object(af, "central_host", lambda project, inspect: "10.0.0.2"), \
+                    mock.patch.object(af, "send", lambda host, line: "ok"), mock.patch("subprocess.run", run):
+                replies = af.install({"folder": folder}, emit=lambda event: None)
+        return replies, calls
+
+    def test_install_requires_exactly_one_class_file_per_source(self):
+        replies, calls = self.install(lambda stem: [stem + ".class"])
+        self.assertEqual(replies, {3: "ok"})
+        self.assertIn(["docker", "cp", mock.ANY, "game1:/scripts/fixture/agent_fixture.class"],
+                      [c[:2] + [mock.ANY, c[3]] for c in calls if c[:2] == ["docker", "cp"]])
+        # A nested or anonymous class would leave a second class file that the overlay never copies.
+        with self.assertRaisesRegex(RuntimeError, "exactly one class file"):
+            self.install(lambda stem: [stem + ".class", stem + "$1.class"])
 
 
 class RelocateTests(unittest.TestCase):

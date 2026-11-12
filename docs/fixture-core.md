@@ -16,20 +16,25 @@ At import, `agent_fixture` discovers every public module of `swg_test_studio.fix
 (`discover`) and merges it into one `Registry` (`merge`). It works with zero, one or any
 number (at most 16) of families. A module is refused, and Studio does not start, when:
 
-- `FIXTURE` is not `"agent_<module name>"`, or the module is called `fixture`;
+- the module name is not `[a-z][a-z_]{0,23}` (letters and `_`: the one family-name rule that the
+  Java source name `agent_<family>.java` and the `reloadScript fixture.agent_<family>` line also
+  use), `FIXTURE` is not `"agent_<module name>"`, or the module is called `fixture`;
 - `TYPES` or a non-empty `OPS` dict is missing; a kind is not `[a-z][a-z0-9_]{0,31}`, its regex
   does not compile, or it redefines an existing kind (core or another family) with a different
   regex. Reusing a kind with the identical regex is allowed;
-- `RANGES` names an undeclared kind, is not `(low, high)` with `low <= high`, or changes the
-  bounds of an existing kind;
+- `RANGES` names an undeclared kind, is not `(low, high)` with `low <= high`, changes the
+  bounds of an existing kind, or bounds a core kind the core leaves unbounded (`coord`, `oid`,
+  `role`, ...);
 - an op name is not `[a-z][A-Za-z0-9]{0,31}`, already exists (core or another family), uses an
   undeclared kind, has an optional `"kind?"` before a required one, or its mutating flag is not
   a bool;
 - `ROLE_ARGS` names an op it does not define, or a position that is not a `role` argument;
 - `SCENARIO_OPS` or `SCENE_CHANGING` is not a set of its own ops; `check` is not callable.
 
-The merged tables are `agent_fixture.TYPES`, `RANGES` and `OPS` (same objects as before, now
-including the families) and `agent_fixture.REGISTRY` (`fixture_of`, `role_args`,
+`CORE_TYPES`, `CORE_RANGES` and `CORE_OPS` are read-only mappings, and `Registry` starts from a
+copy taken before any family module is imported, so a family can neither edit nor rebind the
+core at import. The merged tables are `agent_fixture.TYPES`, `RANGES` and `OPS` (same objects as
+before, now including the families) and `agent_fixture.REGISTRY` (`fixture_of`, `role_args`,
 `scenario_ops`, `scene_changing`, `checks`, `families`, `fixtures`).
 
 Core kinds added for the families (sources/interface.md): `role` = `[a-z][a-z0-9_]{0,31}`,
@@ -47,9 +52,12 @@ Core kinds added for the families (sources/interface.md): `role` = `[a-z][a-z0-9
 
 - `op` is in the merged OPS; argument count and every argument against its kind's regex and
   range; then the family's `check(op, args)`.
-- Every argument is also one printable ASCII token of at most 512 bytes (`TOKEN`), whatever
-  the family regex allows, so no family can let whitespace or control bytes split the console
-  line.
+- Every argument is also one token of at most 512 bytes of the fixed safe class
+  `[A-Za-z0-9_.,:/*^$|()\[\]+?=-]` (`TOKEN`, the union of what the core and family kinds need),
+  whatever the family regex allows: no whitespace or control byte can split the console line, and
+  no quote, backslash, `;`, backtick, `&`, `<`, `>`, `#`, `%`, `!`, `@`, `~`, `{` or `}` reaches it.
+- An argument that is not a `ROLE_ARGS` position must not contain a bot identity
+  (`oid:station:Cap...`, `IDENTITY`): identities reach the console only through role substitution.
 - A `ROLE_ARGS` argument must be another role of the suite, never the acting role.
 - `scenario` is required for an op in `SCENARIO_OPS` and refused for every other op.
 
@@ -68,7 +76,8 @@ game <worker> runScript fixture.<FIXTURE of the op> <op> <oid:station:Cap...> [<
 
 `parse(text, fixture)` accepts the reply prefix of the op's own class only
 (`agent_<family>=<status> ...`); without `fixture` any known class. A reply of another class is
-`unrecognized` and fails the step.
+`unrecognized` and fails the step. A key that appears twice (other than `row`) makes the reply
+`malformed`, never last-key-wins.
 
 ## Runner
 
@@ -77,7 +86,8 @@ game <worker> runScript fixture.<FIXTURE of the op> <op> <oid:station:Cap...> [<
 1. validates the step against the bound roles;
 2. resolves the acting bot's game server with the existing bot query (`driver.bot_query`),
    fresh for every step;
-3. sends the line to the private CentralServer console and checks status and `expect`;
+3. sends the line to the private CentralServer console and checks status and `expect` (a
+   step needs status `ok`; any other status, `partial` included, fails it);
 4. after an op in a family's `SCENE_CHANGING`, waits until the bot query finds the bot again
    (`relocate`): at most `RELOCATE_SECONDS` = 90 s, one query per `RELOCATE_INTERVAL` = 1 s,
    until one game server reports the bot and, when the reply carries `scene=<name>`, reports it
@@ -96,11 +106,17 @@ unchanged):
 | `agent_fixture_changes` | mutating ops used (as before, now over all families) |
 | `agent_fixture_classes` | fixture classes the suite calls |
 | `agent_fixture_partner_roles` | roles named as another bot by `ROLE_ARGS` |
-| `agent_fixture_scenarios` | per scenario id: steps that begin, end and use it |
+| `agent_fixture_scenarios` | one row per (role, scenario id): `id`, `role`, steps that begin, end and use it (`begun`, `ended`, `used`) and `problems` |
 | `agent_fixture_scenarios_all_ended` | every scenario begun or used is ended in the suite |
 
 A `scenarioBegin`/`scenarioEnd` step's id is its `scenario` field if that op is in
-`SCENARIO_OPS`, otherwise its first argument.
+`SCENARIO_OPS`, otherwise its first argument. `scenario_ids` walks the steps in order per role
+and lists each problem as `"<step>: <kind>"`: `end-before-begin` (ended while not open for that
+role), `use-without-begin` (a creating op whose id the role has not open), `ended-by-other-role`
+(another role has the id open; the Java side ends only the acting bot's scenario),
+`begun-twice`, `begin-while-other-open` (the Java side refuses a second open id),
+`scene-change-while-open` (a `SCENE_CHANGING` op of a role with a scenario open) and
+`never-ended`.
 
 ## Cleanup command
 
@@ -109,8 +125,12 @@ python3 swg-tests.py scenario-end --environment environment.json --role actor --
 ```
 
 Sends the scenario family's `scenarioEnd` for the role's bot under the Studio operation lock and
-prints the reply fields. It refuses when no family provides `scenarioEnd`, for a role the
-environment does not bind and for an invalid id, before anything is sent.
+prints the reply status and fields. It refuses when no family provides `scenarioEnd`, for a role
+the environment does not bind and for an invalid id, before anything is sent. It exits 0 only for a
+clean end (`ok`, `was_open=true`, `leaked=0`); a `partial` reply, a leak or `was_open=false` (a
+mistyped id or role) exits 1. It needs the role's bot logged in on the game server of the
+scenario's scene, within reach of what it created; there is no offline cleanup
+(`docs/fixture-scenario.md`).
 
 ## Installer
 
@@ -154,7 +174,7 @@ Not possible from script: nothing was left out of this atom's scope for lack of 
   unless the family lists them in `SCENARIO_OPS`; both shapes are handled.
 - The relocation wait matches a target scene only when the scene-changing op's reply carries
   `scene=<name>`; families should return it.
-- The extra `TOKEN` rule applies to every argument of every family.
+- The extra `TOKEN` and identity rules apply to every argument of every family.
 
 ## Unrun (offline only)
 

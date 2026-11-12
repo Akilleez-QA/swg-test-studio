@@ -95,7 +95,8 @@ def main(argv=None):
                                 help="Compile and load the arrange/inspect fixture into an isolated test server")
     child.add_argument("--environment", type=Path, required=True)
     child = commands.add_parser("scenario-end",
-                                help="Destroy what fixture ops created for one scenario id (cleanup after a failed run)")
+                                help="Destroy what fixture ops created for one scenario id (cleanup after a failed run; "
+                                     "the bot must be logged in where the objects are)")
     child.add_argument("--environment", type=Path, required=True)
     child.add_argument("--role", required=True, help="The role whose bot opened the scenario")
     child.add_argument("--id", required=True, help="Scenario id")
@@ -156,13 +157,21 @@ def main(argv=None):
             from .agent_fixture import install
             install(environment(args.environment), emit)
         elif args.command == "scenario-end":
-            from .agent_fixture import scenario_end
+            # Needs the role's bot logged in on the game server of the scenario's scene, within
+            # reach of what it created (docs/fixture-scenario.md); nothing is cleaned up offline.
+            from .agent_fixture import scenario_end, scenario_end_failure
             from .backend import studio_lock
             env = environment(args.environment)
             with studio_lock(args.workspace):
                 artifact = scenario_end(env, args.role, args.id)
-            emit({"event": "scenario_ended", "role": args.role, "scenario": args.id,
-                  "fields": artifact["reply"]["fields"]})
+            reply = artifact["reply"]
+            event = {"event": "scenario_ended", "role": args.role, "scenario": args.id,
+                     "status": reply["status"], "fields": reply["fields"]}
+            failure = scenario_end_failure(reply)
+            if failure:
+                emit(dict(event, error=failure))
+                return 1
+            emit(event)
         elif args.command == "environment-template":
             emit(environment_template())
         elif args.command in ("select-source", "test-servers"):
