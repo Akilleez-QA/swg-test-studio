@@ -32,6 +32,7 @@ class Profile:
     session_options: frozenset  # supported session options; None: all
     source_inputs: tuple    # server files hashed per run (None: the original WhiteNGold list)
     absent_inputs: tuple    # files of the other tree; recorded, expected to be absent
+    client_kinds: frozenset = None  # supported client_action kinds (docs/fixture-client-actions.md); None: all
 
     @property
     def runtime_log(self):
@@ -89,7 +90,31 @@ RESTORATION_INPUTS = (
     _SCRIPT + 'library/static_item.scriptlib',
     # Saved-state query.
     'src/game/server/database/schema/objects.tab',
+    # Client actions of held sessions (docs/fixture-client-actions.md): what the peer builds and what answers it.
+    _MESSAGES + 'clientGameServer/SecureTradeMessages.h',
+    _MESSAGES + 'clientGameServer/SecureTradeMessages.cpp',
+    _MESSAGES + 'clientGameServer/MessageQueueSecureTrade.h',
+    _MESSAGES + 'clientGameServer/MessageQueueSecureTrade.cpp',
+    _MESSAGES + 'clientGameServer/MessageQueueCommandQueueEnqueue.cpp',
+    _MESSAGES + 'chat/ChatInstantMessageToCharacter.cpp',
+    _MESSAGES + 'chat/ChatOnSendInstantMessage.cpp',
+    _MESSAGES + 'chat/ChatInstantMessageToClient.cpp',
+    _ENGINE + 'server/library/serverGame/src/shared/controller/CreatureController.cpp',
+    _ENGINE + 'server/library/serverGame/src/shared/trading/ServerSecureTrade.cpp',
+    _ENGINE + 'server/library/serverGame/src/shared/trading/ServerSecureTradeManager.cpp',
+    _ENGINE + 'server/library/serverGame/src/shared/command/CommandCppFuncs.cpp',
+    _ENGINE + 'server/application/ConnectionServer/src/shared/ClientConnection.cpp',
+    _ENGINE + 'server/application/ChatServer/src/shared/ConnectionServerConnection.cpp',
+    'dsrc/sku.0/sys.shared/compiled/game/datatables/command/command_table.tab',
 )
+# Client actions a held session sends under restoration: all of them. None needs a zone instance,
+# a station, a ship or the recorder; a group, a trade and a tell are ordinary player-to-player actions.
+RESTORATION_CLIENT_KINDS = frozenset((
+    'session_hold', 'session_release',
+    'group_invite', 'group_join', 'group_decline', 'group_uninvite', 'group_leave', 'group_disband',
+    'group_make_leader', 'group_dismiss',
+    'trade_request', 'trade_accept', 'trade_deny', 'trade_add_item', 'trade_credits', 'trade_offer',
+    'trade_unoffer', 'trade_verify', 'trade_reject', 'trade_cancel', 'tell'))
 WHITENGOLD_ONLY = (
     _ENGINE + 'server/library/serverUtility/src/shared/ZoneInstanceScope.h',
     _ENGINE + 'server/library/serverGame/src/shared/core/TestStudioRecorder.h',
@@ -109,9 +134,10 @@ PROFILES = {
         name='restoration', server_root='/opt/restoration', deployment='StudioTestServer',
         zone_instances=False, capacity_console=False, bot_console='tcp', restart_journals=False,
         recording=False, fixtures=('fixtures/restoration/protocol_bot.java', 'fixtures/agent_fixture.java'),
-        case_kinds=frozenset(('protocol_session', 'agent_fixture')),
+        case_kinds=frozenset(('protocol_session', 'agent_fixture', 'client_action')),
         session_options=frozenset(('role', 'create', 'disconnect', 'expect_scene')),
-        source_inputs=RESTORATION_INPUTS, absent_inputs=WHITENGOLD_ONLY),
+        source_inputs=RESTORATION_INPUTS, absent_inputs=WHITENGOLD_ONLY,
+        client_kinds=RESTORATION_CLIENT_KINDS),
 }
 
 _bound = None
@@ -164,6 +190,9 @@ def unsupported(cases, profile):
                            if key not in profile.session_options and value is not False)
             if extra:
                 reasons.append(f"{case['id']}: session option " + ', '.join(extra))
+        elif case['kind'] == 'client_action' and profile.client_kinds is not None:
+            if case['options'].get('kind') not in profile.client_kinds:
+                reasons.append(f"{case['id']}: client action {case['options'].get('kind')}")
     return reasons
 
 
@@ -172,6 +201,6 @@ def require_supported(cases, profile):
     if reasons:
         raise ValueError(
             f'The {profile.name} server profile cannot run this test ({"; ".join(reasons)}). '
-            'It supports plain login, character creation, disconnect and expected-scene sessions '
-            'and agent_fixture steps; zone instances, shuttles, ships, groups, journeys and '
-            'recordings need the whitengold profile.')
+            'It supports plain login, character creation, disconnect and expected-scene sessions, '
+            'agent_fixture steps and held-session client steps (group, trade, tell); zone instances, '
+            'shuttles, ships, station-staged group sequences, journeys and recordings need the whitengold profile.')

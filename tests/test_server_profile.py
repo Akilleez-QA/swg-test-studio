@@ -161,7 +161,10 @@ class RestorationPlanTests(unittest.TestCase):
             else:
                 self.assertEqual(selected["profile"], "restoration")
                 supported.add(suite["id"])
-        self.assertEqual(supported, {"login_relogin", "create_character"})
+        # Held-session client steps (group, trade, tell) and agent_fixture steps run under restoration too.
+        self.assertEqual(supported, {"login_relogin", "create_character", "group_with_fixture_asserts",
+                                     "scenario_concert", "trade_between_accounts", "trade_two_accounts_client",
+                                     "group_invite_accept_client"})
         for name in ("gamma_shuttle", "ship_and_group", "terminal_journey", "driver_guards"):
             with self.subTest(suite=name):
                 with self.assertRaisesRegex(ValueError, "restoration server profile cannot run"):
