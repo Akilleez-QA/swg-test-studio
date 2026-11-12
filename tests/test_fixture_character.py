@@ -55,6 +55,7 @@ SAMPLES = {
     "equipItem": (["987654321"], None),
     "unequipItem": (["987654321"], None),
     "giveStaticCount": (["item_stimpack_a_01", "10"], "loadout_1"),
+    "resetCharacter": ([], None),
 }
 
 # Each argument kind and the Java token that re-validates it inside the method (or a helper it calls).
@@ -83,7 +84,7 @@ API_LIB = {
     "healing": {"fullHeal"},
     "money": {"bankTo", "deposit", "withdraw", "ACCT_TEST"},
     "pclib": {"resurrectPlayer"},
-    "respec": {"getCombatLevel", "autoLevelPlayer", "earnProfessionSkillsViaNpc"},
+    "respec": {"getCombatLevel", "autoLevelPlayer", "revokeAllSkillsAndExperience"},
     "skill": {"recalcPlayerPools", "setPlayerStatsForLevel"},
     "static_item": {"createNewItemFunction", "MASTER_ITEM_TABLE"},
     "utils": {"getPlayerProfession", "getInventoryContainer", "fullExpertiseReset"},
@@ -99,6 +100,8 @@ API_BASE = {
     "isDead", "getSkillTemplate", "setSkillTemplate", "getSkillListingForPlayer", "revokeSkill", "hasSkill",
     "grantSkill", "dataTableGetInt", "dataTableSearchColumnForString", "getStringCrc", "equip", "putIn",
     "getTemplateName", "hasObjVar", "getStringObjVar", "setObjVar",
+    # scenario helpers copied from agent_scenario.java, and the resetCharacter record
+    "getIntObjVar", "getObjIdArrayObjVar", "removeObjVar", "destroyObject", "getObjVarList",
 }
 JAVA_WORDS = {"if", "for", "while", "switch", "return", "catch", "new", "super", "this", "synchronized", "throw",
               "valueOf", "max", "min", "format", "matches", "equals", "startsWith", "length", "charAt", "split",
@@ -282,6 +285,7 @@ class ConsoleLineTests(unittest.TestCase):
             "unequipItem": f"game 7 runScript fixture.agent_character unequipItem {IDENT} 987654321",
             "giveStaticCount":
                 f"game 7 runScript fixture.agent_character giveStaticCount {IDENT} loadout_1 item_stimpack_a_01 10",
+            "resetCharacter": f"game 7 runScript fixture.agent_character resetCharacter {IDENT}",
         }
         self.assertEqual(set(expected), set(ch.OPS))
         for op, text in expected.items():
@@ -353,6 +357,8 @@ class TypedRefusalTests(unittest.TestCase):
                      ["Reb el", "10"], ["Rebel"]):
             self.refuse("setStanding", args)
         for args in (["me_buff_health_1", "0"], ["me_buff_health_1", "86401"], ["Me_Buff", "10"],
+                     ["me_buff_health_1", "3601"], ["me_stasis_1", "10"], ["me_stasis_self_1", "10"],
+                     ["player_root_immunity", "10"], ["drink_immunity_x", "10"], ["testlongbuff", "10"],
                      ["me_buff_health_1", "10.5"], ["me_buff_health_1"]):
             self.refuse("applyBuff", args)
         for args in (["admin_1a"], ["jedi_1a"], ["commando_2a"], ["commando_1a", "0"], ["commando_1a", "91"],
@@ -388,9 +394,11 @@ class TypedRefusalTests(unittest.TestCase):
             FIXTURE, OPS, RANGES = ch.FIXTURE, ch.OPS, {}
             TYPES = loose
         registry = af.merge([("character", Loose)])
-        af.arguments("setHealth", ["12;game"], registry)      # the widened kind lets it through ...
+        af.arguments("setHealth", ["12x"], registry)          # the widened kind lets it through ...
         with self.assertRaises(ValueError):                    # ... which the real family refuses
-            af.arguments("setHealth", ["12;game"])
+            af.arguments("setHealth", ["12x"])
+        with self.assertRaises(ValueError):                    # and the dispatcher's safe class refuses ';'
+            af.arguments("setHealth", ["12;game"], registry)
 
 
 class JavaParityTests(unittest.TestCase):
@@ -436,11 +444,14 @@ class SafetyTests(unittest.TestCase):
 
     def problems(self, text):
         code = self.code(text)
-        found = [w for w in self.FORBIDDEN if w in code]
+        bare = re.sub(r"\"(?:[^\"\\]|\\.)*\"", "\"\"", code)  # names in deny-list literals are data
+        found = [w for w in self.FORBIDDEN if w in bare]
         found += [f"grantSkill({m})" for m in re.findall(r"\bgrantSkill\(bot,([^)]*)\)", code) if m != '"expertise"']
         if len(re.findall(r"\bisGod\(", code)) != 1:
             found.append("isGod outside the guard")
-        if "setObjVar(item,SCENARIO_VAR,scenario)" not in code or "setObjVar(item,OWNER_VAR,bot)" not in code:
+        give = re.search(r"public String giveStaticCount\(.*?\n    \}", code, re.S)
+        if not give or "if(tag(bot,item,scenario))" not in give.group(0) or \
+                "setObjVar(o,TAG_OWNER,bot)" not in (private_body(code, "tag") or ""):
             found.append("created items are not tagged")
         for name in ("POOL_MAX", "LEVEL_MAX", "CREDITS_MAX", "BUFF_SECONDS_MAX", "GIVE_COUNT_MAX", "REVOKE_MAX",
                      "STANDING_MAX"):
@@ -457,7 +468,10 @@ class SafetyTests(unittest.TestCase):
                                                            "setGod(bot,true);pvpMakeNeutral(bot);\n        pvpSetAlignedFaction")))
         self.assertIn('grantSkill("admin")', [p.replace("bot,", "") for p in
                       self.problems(JAVA.replace('grantSkill(bot,"expertise")', 'grantSkill(bot,"admin")'))])
-        self.assertIn("created items are not tagged", self.problems(JAVA.replace("setObjVar(item,OWNER_VAR,bot);", "")))
+        self.assertIn("created items are not tagged",
+                      self.problems(JAVA.replace("if(tag(bot,item,scenario)) {created++;", "if(isIdValid(item)) {created++;")))
+        self.assertIn("setAdmin", self.problems(JAVA.replace("pvpMakeNeutral(bot);\n        pvpSetAlignedFaction",
+                                                          "setAdminLevel(bot,1);pvpMakeNeutral(bot);\n        pvpSetAlignedFaction")))
 
 
 class ApiClosureTests(unittest.TestCase):

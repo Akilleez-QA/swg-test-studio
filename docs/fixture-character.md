@@ -24,9 +24,11 @@ queues a command or runs free-form text.
 |---|---|---|
 | `POOL_MAX` | 500000 | health and action, current and max (minimum 1) |
 | `LEVEL_MAX` | 90 | `setLevel`, `setProfession` (rows of `player_level`) |
-| `CREDITS_MAX` | 10000000 | `setBank`, `setCash`, `depositCash`, `withdrawCash` (minimum 0) |
+| `CREDITS_MAX` | 10000000 | `setBank`, `setCash`, `depositCash`, `withdrawCash` (minimum 0); also the cash plus bank total each of them must leave (`creditCap`, refusal `credits-cap`) |
 | `STANDING_MIN`/`STANDING_MAX` | -5000 / 50000 | `setStanding` (`factions.FACTION_RATING_MIN`; the library clamps to the rank cap) |
-| `BUFF_SECONDS_MAX` | 86400 | `applyBuff` (minimum 1 s) |
+| `BUFF_SECONDS_MAX` | 3600 | `applyBuff` (minimum 1 s; one hour, the longest duration of the allowed buffs in the buff table) |
+| `SCENARIO_CREATE_MAX` | 100 | objects one open scenario may create, `giveStaticCount` included (shared with `agent_scenario`) |
+| `RESPEC_LEVEL_MIN` | 5 | `setProfession` raises a lower level to it, as the NPC respec does |
 | `GIVE_COUNT_MAX` | 25 | `giveStaticCount` (minimum 1) |
 | `REVOKE_MAX` | 500 | `revokeSkills` skills per call |
 
@@ -60,25 +62,28 @@ The Java side re-checks membership in `gm.getRoadmapList()` at run time.
 | `revive` | – | resurrects a dead bot (clears death effects, full heal); stands an incapacitated bot up | `was_down` + `stats` keys | pclib.resurrectPlayer, setPostureClientImmediate |
 | `setPosture` | `<posture>` | posture, shown to clients immediately; refused while down | `posture` | setPostureClientImmediate, getPosture |
 | `setLevel` | `<1..90>` | the respec library's level grant (raises or lowers along the current roadmap), then pool recalculation | `requested before level template` | respec.autoLevelPlayer, skill.recalcPlayerPools, skill.setPlayerStatsForLevel, getSkillTemplate, getLevel |
-| `setProfession` | `<roadmap> [1..90]` | the NPC respec path: `setSkillTemplate`, then `respec.earnProfessionSkillsViaNpc` (revokes all skills and experience, removes buffs, levels the new roadmap). Level defaults to the current one | `before requested_level` + `stats` keys | gm.getRoadmapList, setSkillTemplate, respec.earnProfessionSkillsViaNpc |
+| `setProfession` | `<roadmap> [1..90]` | the skill part of the NPC respec without its items: `setSkillTemplate`, `respec.revokeAllSkillsAndExperience` (all skills except species, language, pilot, costume and similar, and all experience; a Jedi would get the elder badge, and a bounty mission is aborted), then `respec.autoLevelPlayer(bot, level, false)` (no roadmap items) and the pool recalculation. Level defaults to the current one, at least `RESPEC_LEVEL_MIN`. Effects on buffs and pets: none; unlike `respec.earnProfessionSkillsViaNpc` (whose `autoLevelPlayer(..., true)` grants untagged roadmap items whatever its `withItems` argument) it neither removes buffs nor stores called pets and vehicles, and it does not add the `class_trader` or `expertise` skill that path adds (use `grantSkills`) | `before requested_level items_granted` + `stats` keys | gm.getRoadmapList, setSkillTemplate, respec.revokeAllSkillsAndExperience, respec.autoLevelPlayer, skill.recalcPlayerPools, skill.setPlayerStatsForLevel |
 | `revokeSkills` | `<pattern>` | revokes every held skill whose name fully matches; same pattern limits as the core `grantSkills` (no quantified group, at most two `*`/`+` and three quantifiers), at most 500 | rows `revoked,<skill>` / `failed,<skill>`, `revoked failed capped` | getSkillListingForPlayer, revokeSkill, hasSkill |
 | `resetExpertise` | – | the NPC reallocation reset (`utils.fullExpertiseReset`), then grants the `expertise` skill back if it went | `expertise_skills has_expertise` | utils.fullExpertiseReset, hasSkill, grantSkill |
-| `setBank` | `<0..10000000>` | moves the difference from or to the `money.ACCT_TEST` ("testing") named account | `target bank_before pending cash bank` | money.bankTo, money.ACCT_TEST, getBankBalance |
-| `setCash` | `<0..10000000>` | deposits the surplus, or withdraws the shortfall when the bank holds it | `target cash_before pending cash bank` | money.deposit, money.withdraw, getCashBalance, getBankBalance |
-| `depositCash` | `<0..10000000>` | cash to bank, at most the cash held | `amount pending cash bank` | money.deposit |
-| `withdrawCash` | `<0..10000000>` | bank to cash, at most the bank balance | `amount pending cash bank` | money.withdraw |
-| `setFaction` | `<Imperial\|Rebel\|Neutral>` | neutral and unaligned, or aligned to the faction table's `pvpFaction` and covert (the engine calls `factions.joinFaction` and the resignation path use) | `faction faction_id pvp_type` | factions.getFactionNumber, dataTableGetInt, factions.FACTION_TABLE, pvpMakeNeutral, pvpSetAlignedFaction, pvpMakeCovert |
-| `setStanding` | `<faction> <-5000..50000>` | standing in a faction whose table row has `playerAllowed=1` | `faction requested standing` | factions.setFactionStanding, factions.getFactionNumber, dataTableGetInt |
+| `setBank` | `<0..10000000>` | moves the difference from or to the `money.ACCT_TEST` ("testing") named account; refused when cash plus the new bank balance exceeds `CREDITS_MAX` | `target bank_before pending cash bank` | money.bankTo, money.ACCT_TEST, getBankBalance |
+| `setCash` | `<0..10000000>` | deposits the surplus, or withdraws the shortfall when the bank holds it; refused when cash plus bank exceeds `CREDITS_MAX` | `target cash_before pending cash bank` | money.deposit, money.withdraw, getCashBalance, getBankBalance |
+| `depositCash` | `<0..10000000>` | cash to bank, at most the cash held; refused when cash plus bank exceeds `CREDITS_MAX` | `amount pending cash bank` | money.deposit |
+| `withdrawCash` | `<0..10000000>` | bank to cash, at most the bank balance; refused when cash plus bank exceeds `CREDITS_MAX` | `amount pending cash bank` | money.withdraw |
+| `setFaction` | `<Imperial\|Rebel\|Neutral>` | neutral and unaligned, or aligned to the faction table's `pvpFaction` and covert (the engine calls `factions.joinFaction` and the resignation path use); the first change records the original faction and pvp type under `fixture.r` | `faction faction_id pvp_type` | factions.getFactionNumber, dataTableGetInt, factions.FACTION_TABLE, pvpMakeNeutral, pvpSetAlignedFaction, pvpMakeCovert |
+| `setStanding` | `<faction> <-5000..50000>` | standing in a faction whose table row has `playerAllowed=1`; the first change of a faction records its original standing under `fixture.r` | `faction requested standing` | factions.setFactionStanding, factions.getFactionNumber, dataTableGetInt |
 | `setPvpType` | `<neutral\|covert\|declared\|onleave>` | PvP status; anything but neutral needs an aligned faction | `requested pvp_type faction` | pvpMakeNeutral, pvpMakeCovert, pvpMakeDeclared, pvpMakeOnLeave |
-| `applyBuff` | `<name> <1..86400>` | applies a buff the buff table knows for that many seconds | `buff has seconds_left` | buff.getBuffNameFromCrc, getStringCrc, buff.applyBuff, buff.hasBuff, buff.getBuffTimeRemaining |
-| `removeBuff` | `<name>` | removes it | `buff had removed has` | buff.hasBuff, buff.removeBuff |
+| `applyBuff` | `<name> <1..3600>` | applies an allowed buff the buff table knows for that many seconds and records it for `resetCharacter`. Allowed: names starting with `me_buff_`, `drink_`, `dish_`, `dessert_` or `foraged_` (136 rows of the server's buff table: medic stat buffs and food, drink and foraged consumables, whose effects are attribute and skill mods only, no state, callback or immunity) and containing none of `immun`, `invuln`, `stasis`, `god`, `gm_`, `admin`. Everything else is refused, including the `me_stasis_*` damage-immune buffs, the `*_immunity` buffs and the test buffs (Python `check` and Java `allowedBuff` hold the same lists) | `buff has seconds_left` | buff.getBuffNameFromCrc, getStringCrc, buff.applyBuff, buff.hasBuff, buff.getBuffTimeRemaining |
+| `removeBuff` | `<name>` | removes it (any buff) | `buff had removed has` | buff.hasBuff, buff.removeBuff |
 | `equipItem` | `<itemOid>` | equips an item that is directly in the bot's inventory | `item template worn` | utils.getInventoryContainer, getContainedBy, equip, getTemplateName |
 | `unequipItem` | `<itemOid>` | puts an item the bot wears back into its inventory | `item worn` | getContainedBy, utils.getInventoryContainer, putIn |
-| `giveStaticCount` | scenario id, `<name> <1..25>` | that many copies of one `master_item` static item in the inventory, each tagged `fixture.scenario`=id and `fixture.owner`=bot; needs that id open on the bot (`fixture.scenario_open`) | rows of item oids, `scenario name created failed` | hasObjVar, getStringObjVar, dataTableSearchColumnForString, static_item.MASTER_ITEM_TABLE, static_item.createNewItemFunction, setObjVar |
+| `giveStaticCount` | scenario id, `<name> <1..25>` | that many copies of one `master_item` static item in the inventory. Exactly like the scenario family's creating ops: needs that id open on the bot (`fixture.scenario_open`), counts against `SCENARIO_CREATE_MAX` (`mayCreate`), and each item is tagged `fixture.scenario`=id and `fixture.owner`=bot and recorded in `fixture.scenario_ids` (`tag`); an item that cannot be tagged is destroyed again | rows of item oids, `scenario name created failed` | hasObjVar, getStringObjVar, getIntObjVar, getObjIdArrayObjVar, removeObjVar, destroyObject, dataTableSearchColumnForString, static_item.MASTER_ITEM_TABLE, static_item.createNewItemFunction, setObjVar |
+| `resetCharacter` | – | undoes what this family can undo: removes the buffs `applyBuff` applied; restores the faction, pvp type and standings recorded before the first `setFaction`/`setPvpType`/`setStanding`; revives a dead or incapacitated bot and stands it upright; recalculates the pool maxima from level and skills (undoing `setMaxHealth`/`setMaxAction`) and fills health and action; removes the `fixture.t.*` test objvars, the `fixture.snapshot.*` snapshots and the `fixture.r.*` record. It cannot undo level, profession, skills, expertise, credits, items, quests or buffs it did not apply, and leaves an open scenario alone (use `scenarioEnd`) | `buffs_removed standings_restored faction_restored was_down test_vars_cleared snapshots_cleared` + `stats` keys | getObjVarList, buff.hasBuff, buff.removeBuff, factions.setFactionStanding, getIntObjVar, pvpMakeNeutral, pvpSetAlignedFaction, pvpMakeCovert, pvpMakeDeclared, pclib.resurrectPlayer, setPostureClientImmediate, skill.recalcPlayerPools, setAttrib, getMaxAttrib, removeObjVar |
 
 `giveStaticCount` is the family's only `SCENARIO_OPS` op: the step needs `"scenario": "<id>"`
 and its Java method takes the id as its first argument (`request(value,"giveStaticCount",3,3)`).
-The scenario family's `scenarioEnd` finds the items in the bot's inventory by their tag.
+The scenario family's `scenarioEnd` finds the items in the bot's inventory by their tag and counts
+any it cannot reach as leaked. The helpers `openScenario`, `mayCreate`, `liveIds`, `storeIds`, `tag`
+and `forget` are copied verbatim from `agent_scenario.java` (a test checks they stay identical).
 
 Guard API (all ops): getConfigSetting, isIdValid, exists, isPlayer, getPlayerFullName,
 getPlayerStationId, isGod, and for `equipItem`/`unequipItem` the reach rule's getLocation,
@@ -112,8 +117,12 @@ Every behaviour below is unrun: no console line of this class has reached a serv
 - `setMaxHealth`/`setMaxAction` against later skill or level recalculations, which may recompute the
   maximum; whether a set current pool survives regeneration until the next step.
 - `setLevel` lowering a level (the library revokes roadmap skills) and the pool recalculation after it.
-- `setProfession` end to end: skills and items of the new roadmap, the level raised to at least 5 by
-  the library, the respec bookkeeping objvars the NPC flow sets that this op does not.
+- `setProfession` end to end: skills of the new roadmap, that no item appears in the inventory, the
+  respec bookkeeping objvars the NPC flow sets that this op does not.
+- `resetCharacter`: restoring a recorded pvp type, standing restore against the rank cap, the
+  recalculated pool maxima; whether `obj_var.getName()` of a list entry is the short name it uses.
+- The credit cap against balances changed by pending transfers (balances are read before the
+  asynchronous transfer completes).
 - `revokeSkills` and `resetExpertise` effects on derived skill mods and abilities.
 - Credit transfers: completion, ordering of two quick transfers, the `testing` named account
   behaviour.

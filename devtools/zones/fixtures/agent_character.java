@@ -13,10 +13,13 @@ import script.library.*;
  * "agent_character=<status> key=value ..." and acts only on the one exact
  * registered non-god bot. Nothing here grants god mode or an admin level,
  * attaches a script or runs a free-form command. Level and profession use
- * the respec library the server uses for its own respec; credits use the
- * money library; standing uses the factions library; buffs the buff library.
- * Every numeric argument has a named cap below. One top-level type only, so
- * it deploys as a single compiled file.
+ * the respec library the server uses for its own respec (its no-items
+ * variant: nothing is placed in the inventory); credits use the money
+ * library; standing uses the factions library; buffs the buff library.
+ * Every numeric argument has a named cap below. giveStaticCount tags and
+ * counts what it creates exactly as the scenario family does (the scenario
+ * helpers below are copied verbatim from agent_scenario.java). One
+ * top-level type only, so it deploys as a single compiled file.
  */
 public class agent_character extends base_script {
     private static final String P="agent_character=";
@@ -29,11 +32,19 @@ public class agent_character extends base_script {
     private static final String NAME_RE="[a-z0-9_]{1,64}";
     private static final String CELL_RE="[A-Za-z0-9_]{1,64}";
 
-    // Scenario tagging (sources/interface.md).
+    // Scenario tagging (sources/interface.md): the same objvars and cap as agent_scenario.java.
     private static final String SCENARIO_RE="[a-z][a-z0-9_]{0,31}";
-    private static final String SCENARIO_VAR="fixture.scenario";
-    private static final String OWNER_VAR="fixture.owner";
-    private static final String SCENARIO_OPEN_VAR="fixture.scenario_open";
+    private static final String TAG_SCENARIO="fixture.scenario";
+    private static final String TAG_OWNER="fixture.owner";
+    private static final String OPEN_VAR="fixture.scenario_open";
+    private static final String CREATED_VAR="fixture.scenario_created";
+    private static final String IDS_VAR="fixture.scenario_ids";
+    private static final int SCENARIO_CREATE_MAX=100;
+    // Objvar roots resetCharacter clears: test objvars, snapshots, and this family's own record
+    // of what it changed (applied buffs, original faction, pvp type and standings).
+    private static final String TEST_VAR_ROOT="fixture.t";
+    private static final String SNAPSHOT_ROOT="fixture.snapshot";
+    private static final String RESET_ROOT="fixture.r";
 
     // Named caps; the Python module swg_test_studio/fixture_ops/character.py uses the same values.
     private static final int POOL_MAX=500000;
@@ -41,7 +52,14 @@ public class agent_character extends base_script {
     private static final int CREDITS_MAX=10000000;
     private static final float STANDING_MIN=-5000.0f;
     private static final float STANDING_MAX=50000.0f;
-    private static final int BUFF_SECONDS_MAX=86400;
+    private static final int BUFF_SECONDS_MAX=3600;
+    // applyBuff accepts only these buff-table families: medic stat buffs and food, drink and
+    // foraged consumables (attribute and skill-mod effects, no state, callback or immunity);
+    // a name containing any BUFF_DENY part is refused even then.
+    private static final String[] BUFF_PREFIXES={"me_buff_","drink_","dish_","dessert_","foraged_"};
+    private static final String[] BUFF_DENY={"immun","invuln","stasis","god","gm_","admin"};
+    // The NPC respec raises a level below this to it; setProfession does the same.
+    private static final int RESPEC_LEVEL_MIN=5;
     private static final int GIVE_COUNT_MAX=25;
     private static final int REVOKE_MAX=500;
 
@@ -249,6 +267,23 @@ public class agent_character extends base_script {
         if(list!=null) for(String r:list) if(r.equals(template)) return true;
         return false;
     }
+    /** A buff applyBuff may apply: one of BUFF_PREFIXES and none of BUFF_DENY. */
+    private static boolean allowedBuff(String n) {
+        if(n==null) return false;
+        for(String deny:BUFF_DENY) if(n.contains(deny)) return false;
+        for(String prefix:BUFF_PREFIXES) if(n.startsWith(prefix)) return true;
+        return false;
+    }
+    /** Null when a cash plus bank total stays within CREDITS_MAX, else a refusal. */
+    private static String creditCap(long total) {
+        return total>CREDITS_MAX?"refused reason=credits-cap total="+total+" cap="+CREDITS_MAX:null;
+    }
+    /** Records the bot's aligned faction and pvp type once, before the first change (resetCharacter restores them). */
+    private static void rememberFaction(obj_id bot) throws InterruptedException {
+        if(hasObjVar(bot,RESET_ROOT+".faction")) return;
+        setObjVar(bot,RESET_ROOT+".faction",pvpGetAlignedFaction(bot));
+        setObjVar(bot,RESET_ROOT+".pvp",pvpGetType(bot));
+    }
     /** The skill-pattern limits of the core grantSkills: null when the pattern is refused. */
     private static java.util.regex.Pattern skillPattern(String re) {
         if(re==null || !re.matches(SKILL_PATTERN_RE) || re.matches(".*\\)[*+?].*")) return null;
@@ -278,6 +313,51 @@ public class agent_character extends base_script {
         kv(sb,"skills",skills==null?0:skills.length);
         return sb;
     }
+    /** The scenario id the bot has open, or null. */
+    private static String openScenario(obj_id bot) throws InterruptedException {
+        return hasObjVar(bot,OPEN_VAR)?getStringObjVar(bot,OPEN_VAR):null;
+    }
+
+    /** Null when the bot has scenario id open and its creation cap allows n more objects, else a status. */
+    private static String mayCreate(obj_id bot,String id,int n) throws InterruptedException {
+        if(!id.equals(openScenario(bot))) return "refused reason=scenario-not-open scenario="+id;
+        int created=hasObjVar(bot,CREATED_VAR)?getIntObjVar(bot,CREATED_VAR):0;
+        if(created+n>SCENARIO_CREATE_MAX) return "refused reason=scenario-cap cap="+SCENARIO_CREATE_MAX;
+        return null;
+    }
+
+    /** The ids the open scenario created and has not destroyed (fixture.scenario_ids). */
+    private static java.util.List<obj_id> liveIds(obj_id bot) throws InterruptedException {
+        java.util.List<obj_id> ids=new java.util.ArrayList<obj_id>();
+        obj_id[] stored=hasObjVar(bot,IDS_VAR)?getObjIdArrayObjVar(bot,IDS_VAR):null;
+        if(stored!=null) for(obj_id x:stored) if(isIdValid(x) && !ids.contains(x)) ids.add(x);
+        return ids;
+    }
+
+    /** Replaces the record of live created ids; an empty list removes it. */
+    private static boolean storeIds(obj_id bot,java.util.List<obj_id> ids) throws InterruptedException {
+        if(ids.isEmpty()) {removeObjVar(bot,IDS_VAR);return true;}
+        return setObjVar(bot,IDS_VAR,ids.toArray(new obj_id[0]));
+    }
+
+    /** Tags a freshly created object, records its id and counts it against the cap; destroys it when any of that fails. */
+    private static boolean tag(obj_id bot,obj_id o,String id) throws InterruptedException {
+        if(!isIdValid(o)) return false;
+        if(!setObjVar(o,TAG_SCENARIO,id) || !setObjVar(o,TAG_OWNER,bot)) {destroyObject(o);return false;}
+        java.util.List<obj_id> ids=liveIds(bot);
+        ids.add(o);
+        if(!storeIds(bot,ids)) {destroyObject(o);return false;}
+        int created=hasObjVar(bot,CREATED_VAR)?getIntObjVar(bot,CREATED_VAR):0;
+        setObjVar(bot,CREATED_VAR,created+1);
+        return true;
+    }
+
+    /** Drops a destroyed object from the record of live created ids. */
+    private static void forget(obj_id bot,obj_id o) throws InterruptedException {
+        java.util.List<obj_id> ids=liveIds(bot);
+        if(ids.remove(o)) storeIds(bot,ids);
+    }
+
     private static StringBuilder wallet(StringBuilder sb,obj_id bot) throws InterruptedException {
         kv(sb,"cash",getCashBalance(bot));kv(sb,"bank",getBankBalance(bot));
         return sb;
@@ -312,7 +392,7 @@ public class agent_character extends base_script {
         if(crcs!=null) for(int crc:crcs) {
             String n=buff.getBuffNameFromCrc(crc);
             count++;
-            row(sb,rc,n==null?String.valueOf(crc):n,String.format("%.1f",buff.getBuffTimeRemaining(bot,crc)));
+            row(sb,rc,n==null?String.valueOf(crc):n,String.format(java.util.Locale.ROOT,"%.1f",buff.getBuffTimeRemaining(bot,crc)));
         }
         kv(sb,"count",count);
         if(only!=null) {kv(sb,"buff",only);kv(sb,"has",buff.hasBuff(bot,only));}
@@ -456,11 +536,16 @@ public class agent_character extends base_script {
     }
 
     /**
-     * setProfession <roadmap> [level]: the NPC respec path of the respec
-     * library: setSkillTemplate, then respec.earnProfessionSkillsViaNpc
-     * (revokes all skills and experience, removes buffs, levels the new
-     * roadmap). Level defaults to the current level; the library raises
-     * anything below 5 to 5. Only gm.getRoadmapList() names are accepted.
+     * setProfession <roadmap> [level]: the skill part of the NPC respec
+     * without its roadmap items: setSkillTemplate,
+     * respec.revokeAllSkillsAndExperience, then respec.autoLevelPlayer with
+     * withItems=false and the respec pool recalculation. Unlike
+     * respec.earnProfessionSkillsViaNpc (whose autoLevelPlayer always grants
+     * the untagged roadmap items) it neither removes buffs nor stores called
+     * pets and vehicles, and it does not add the class_trader or expertise
+     * skill the NPC path adds. Level defaults to the current level; below
+     * RESPEC_LEVEL_MIN it is raised to it, as the NPC path does. Only
+     * gm.getRoadmapList() names are accepted.
      */
     public String setProfession(String value) throws InterruptedException {
         Object[] q=request(value,"setProfession",1,2);
@@ -472,9 +557,14 @@ public class agent_character extends base_script {
         if(!roadmap(args[0])) return fail("refused reason=not-a-roadmap profession="+enc(args[0]));
         String before=getSkillTemplate(bot);
         setSkillTemplate(bot,args[0]);
-        respec.earnProfessionSkillsViaNpc(bot,args[0],false,level);
-        StringBuilder sb=start(args[0].equals(getSkillTemplate(bot))?"ok":"refused");
-        kv(sb,"before",before);kv(sb,"requested_level",level);
+        respec.revokeAllSkillsAndExperience(bot);
+        boolean ok=respec.autoLevelPlayer(bot,Math.max(RESPEC_LEVEL_MIN,level),false);
+        if(ok) {
+            skill.recalcPlayerPools(bot,true);
+            skill.setPlayerStatsForLevel(bot,getLevel(bot));
+        }
+        StringBuilder sb=start(ok && args[0].equals(getSkillTemplate(bot))?"ok":"refused");
+        kv(sb,"before",before);kv(sb,"requested_level",level);kv(sb,"items_granted",false);
         return sheet(sb,bot).toString();
     }
 
@@ -520,7 +610,7 @@ public class agent_character extends base_script {
     // Credits (money library; transfers complete asynchronously)
     // ------------------------------------------------------------------
 
-    /** setBank <0..CREDITS_MAX>: moves the difference from or to the money.ACCT_TEST named account. */
+    /** setBank <0..CREDITS_MAX>: moves the difference from or to the money.ACCT_TEST named account; cash plus bank stays within CREDITS_MAX. */
     public String setBank(String value) throws InterruptedException {
         Object[] q=request(value,"setBank",1,1);
         if(q[0]!=null) return fail((String)q[0]);
@@ -528,13 +618,15 @@ public class agent_character extends base_script {
         Integer target=bounded(args[0],CREDITS_RE,0,CREDITS_MAX);
         if(target==null) return invalidArgs("credits");
         int bank=getBankBalance(bot),diff=target-bank;
+        String cap=creditCap((long)getCashBalance(bot)+target);
+        if(cap!=null) return fail(cap);
         boolean ok=diff==0 || (diff>0?money.bankTo(money.ACCT_TEST,bot,diff):money.bankTo(bot,money.ACCT_TEST,-diff));
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"target",target);kv(sb,"bank_before",bank);kv(sb,"pending",diff!=0);
         return wallet(sb,bot).toString();
     }
 
-    /** setCash <0..CREDITS_MAX>: deposits the surplus or withdraws the shortfall from the bank. */
+    /** setCash <0..CREDITS_MAX>: deposits the surplus or withdraws the shortfall from the bank; refused when cash plus bank exceeds CREDITS_MAX. */
     public String setCash(String value) throws InterruptedException {
         Object[] q=request(value,"setCash",1,1);
         if(q[0]!=null) return fail((String)q[0]);
@@ -543,6 +635,8 @@ public class agent_character extends base_script {
         if(target==null) return invalidArgs("credits");
         int cash=getCashBalance(bot),bank=getBankBalance(bot),diff=target-cash;
         if(diff>bank) return fail("refused reason=bank-too-low bank="+bank+" needed="+diff);
+        String cap=creditCap((long)cash+bank);
+        if(cap!=null) return fail(cap);
         boolean ok=diff==0 || (diff>0?money.withdraw(bot,diff):money.deposit(bot,-diff));
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"target",target);kv(sb,"cash_before",cash);kv(sb,"pending",diff!=0);
@@ -557,6 +651,8 @@ public class agent_character extends base_script {
         Integer amount=bounded(args[0],CREDITS_RE,0,CREDITS_MAX);
         if(amount==null) return invalidArgs("credits");
         if(amount>getCashBalance(bot)) return fail("refused reason=not-enough-cash cash="+getCashBalance(bot));
+        String cap=creditCap((long)getCashBalance(bot)+getBankBalance(bot));
+        if(cap!=null) return fail(cap);
         boolean ok=money.deposit(bot,amount);
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"amount",amount);kv(sb,"pending",amount!=0);
@@ -571,6 +667,8 @@ public class agent_character extends base_script {
         Integer amount=bounded(args[0],CREDITS_RE,0,CREDITS_MAX);
         if(amount==null) return invalidArgs("credits");
         if(amount>getBankBalance(bot)) return fail("refused reason=not-enough-bank bank="+getBankBalance(bot));
+        String cap=creditCap((long)getCashBalance(bot)+getBankBalance(bot));
+        if(cap!=null) return fail(cap);
         boolean ok=amount==0 || money.withdraw(bot,amount);
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"amount",amount);kv(sb,"pending",amount!=0);
@@ -598,6 +696,7 @@ public class agent_character extends base_script {
             hash=row<0?0:dataTableGetInt(factions.FACTION_TABLE,row,"pvpFaction");
             if(hash==0) return fail("refused reason=no-pvp-faction faction="+enc(args[0]));
         }
+        rememberFaction(bot);
         pvpMakeNeutral(bot);
         pvpSetAlignedFaction(bot,hash);
         if(hash!=0) pvpMakeCovert(bot);
@@ -615,6 +714,7 @@ public class agent_character extends base_script {
         Float v=args[1].matches(STANDING_RE)?num(args[1],STANDING_MIN,STANDING_MAX):null;
         if(f==null || !f.matches(FACTION_RE) || v==null) return invalidArgs("setStanding");
         if(!playerFaction(f)) return fail("refused reason=not-player-faction faction="+enc(f));
+        if(!hasObjVar(bot,RESET_ROOT+".standing."+f)) setObjVar(bot,RESET_ROOT+".standing."+f,factions.getFactionStanding(bot,f));
         factions.setFactionStanding(bot,f,v);
         StringBuilder sb=start("ok");
         kv(sb,"faction",f);kv(sb,"requested",v);kv(sb,"standing",factions.getFactionStanding(bot,f));
@@ -629,6 +729,7 @@ public class agent_character extends base_script {
         int i=pick(args[0],PVP_TYPES);
         if(i<0) return invalidArgs("pvpType");
         if(i>0 && pvpGetAlignedFaction(bot)==0) return fail("refused reason=no-faction use=setFaction");
+        rememberFaction(bot);
         if(i==0) pvpMakeNeutral(bot);
         else if(i==1) pvpMakeCovert(bot);
         else if(i==2) pvpMakeDeclared(bot);
@@ -642,7 +743,7 @@ public class agent_character extends base_script {
     // Buffs
     // ------------------------------------------------------------------
 
-    /** applyBuff <name> <1..86400 s>: buff.applyBuff for a buff the buff table knows. */
+    /** applyBuff <name> <1..BUFF_SECONDS_MAX s>: buff.applyBuff for an allowed buff (allowedBuff) the buff table knows; recorded for resetCharacter. */
     public String applyBuff(String value) throws InterruptedException {
         Object[] q=request(value,"applyBuff",2,2);
         if(q[0]!=null) return fail((String)q[0]);
@@ -650,10 +751,12 @@ public class agent_character extends base_script {
         String n=name(args[0]);
         Integer seconds=bounded(args[1],SECONDS_RE,1,BUFF_SECONDS_MAX);
         if(n==null || seconds==null) return invalidArgs("applyBuff");
+        if(!allowedBuff(n)) return fail("refused reason=buff-not-allowed buff="+n);
         if(buff.getBuffNameFromCrc(getStringCrc(n))==null) return fail("refused reason=unknown-buff buff="+n);
         boolean ok=buff.applyBuff(bot,n,seconds.floatValue());
+        if(ok) setObjVar(bot,RESET_ROOT+".buff."+n,1);
         StringBuilder sb=start(ok?"ok":"refused");
-        kv(sb,"buff",n);kv(sb,"has",buff.hasBuff(bot,n));kv(sb,"seconds_left",String.format("%.1f",buff.getBuffTimeRemaining(bot,n)));
+        kv(sb,"buff",n);kv(sb,"has",buff.hasBuff(bot,n));kv(sb,"seconds_left",String.format(java.util.Locale.ROOT,"%.1f",buff.getBuffTimeRemaining(bot,n)));
         return sb.toString();
     }
 
@@ -666,6 +769,7 @@ public class agent_character extends base_script {
         if(n==null) return invalidArgs("buffName");
         boolean had=buff.hasBuff(bot,n);
         boolean removed=had && buff.removeBuff(bot,n);
+        if(removed) removeObjVar(bot,RESET_ROOT+".buff."+n);
         StringBuilder sb=start("ok");
         kv(sb,"buff",n);kv(sb,"had",had);kv(sb,"removed",removed);kv(sb,"has",buff.hasBuff(bot,n));
         return sb.toString();
@@ -713,9 +817,11 @@ public class agent_character extends base_script {
 
     /**
      * giveStaticCount <scenario> <name> <1..25>: creates that many copies of
-     * one master_item static item in the bot's inventory, each tagged with
-     * fixture.scenario and fixture.owner, so the scenario family's
-     * scenarioEnd removes them. Needs that scenario open on the bot.
+     * one master_item static item in the bot's inventory. Like the scenario
+     * family's creating ops it needs that scenario open on the bot, counts
+     * against its cap (mayCreate) and tags and records each item (tag), so
+     * the scenario family's scenarioEnd removes them; an item that cannot be
+     * tagged is destroyed again.
      */
     public String giveStaticCount(String value) throws InterruptedException {
         Object[] q=request(value,"giveStaticCount",3,3);
@@ -726,8 +832,8 @@ public class agent_character extends base_script {
         String n=name(args[1]);
         Integer count=bounded(args[2],COUNT_RE,1,GIVE_COUNT_MAX);
         if(n==null || count==null) return invalidArgs("giveStaticCount");
-        if(!hasObjVar(bot,SCENARIO_OPEN_VAR) || !scenario.equals(getStringObjVar(bot,SCENARIO_OPEN_VAR)))
-            return fail("refused reason=scenario-not-open scenario="+scenario);
+        String s=mayCreate(bot,scenario,count);
+        if(s!=null) return fail(s);
         if(dataTableSearchColumnForString(n,"name",static_item.MASTER_ITEM_TABLE)<0) return fail("refused reason=unknown-static-item name="+n);
         obj_id inventory=utils.getInventoryContainer(bot);
         if(!isIdValid(inventory)) return fail("refused reason=no-inventory");
@@ -737,15 +843,71 @@ public class agent_character extends base_script {
         int[] rc=new int[2];
         for(int i=0;i<count;i++) {
             obj_id item=static_item.createNewItemFunction(n,inventory);
-            if(isIdValid(item)) {
-                setObjVar(item,SCENARIO_VAR,scenario);
-                setObjVar(item,OWNER_VAR,bot);
-                created++;
-                row(sb,rc,item);
-            }
+            if(tag(bot,item,scenario)) {created++;row(sb,rc,item);}
             else failed++;
         }
         kv(sb,"created",created);kv(sb,"failed",failed);
         return end(sb,rc);
+    }
+
+    // ------------------------------------------------------------------
+    // Reset
+    // ------------------------------------------------------------------
+
+    /**
+     * resetCharacter: undoes what this family's setters changed and can be
+     * undone. Removes the buffs applyBuff applied (recorded under
+     * fixture.r.buff); restores the aligned faction and pvp type recorded
+     * before the first setFaction or setPvpType and every standing recorded
+     * before the first setStanding of that faction; revives a dead or
+     * incapacitated bot (pclib.resurrectPlayer) and stands it upright;
+     * recalculates the pool maxima from level and skills
+     * (skill.recalcPlayerPools, which undoes setMaxHealth/setMaxAction) and
+     * fills health and action; removes the fixture.t.* test objvars, the
+     * fixture.snapshot.* snapshots and the fixture.r.* record. It cannot undo
+     * level, profession, skills, expertise, credits, items, quests or buffs
+     * the fixture did not apply, and it leaves an open scenario alone.
+     */
+    public String resetCharacter(String value) throws InterruptedException {
+        Object[] q=request(value,"resetCharacter",0,0);
+        if(q[0]!=null) return fail((String)q[0]);
+        obj_id bot=(obj_id)q[1];
+        int buffs=0,standings=0;
+        obj_var_list applied=getObjVarList(bot,RESET_ROOT+".buff");
+        if(applied!=null) for(int i=0;i<applied.getNumItems();i++) {
+            obj_var v=applied.getObjVar(i);
+            String n=v==null?null:name(v.getName());
+            if(n!=null && buff.hasBuff(bot,n) && buff.removeBuff(bot,n)) buffs++;
+        }
+        obj_var_list stood=getObjVarList(bot,RESET_ROOT+".standing");
+        if(stood!=null) for(int i=0;i<stood.getNumItems();i++) {
+            obj_var v=stood.getObjVar(i);
+            if(v==null || !playerFaction(v.getName()) || !(v.getData() instanceof Float)) continue;
+            factions.setFactionStanding(bot,v.getName(),((Float)v.getData()).floatValue());
+            standings++;
+        }
+        boolean faction=hasObjVar(bot,RESET_ROOT+".faction");
+        if(faction) {
+            int hash=getIntObjVar(bot,RESET_ROOT+".faction");
+            int type=hasObjVar(bot,RESET_ROOT+".pvp")?getIntObjVar(bot,RESET_ROOT+".pvp"):PVPTYPE_NEUTRAL;
+            pvpMakeNeutral(bot);
+            pvpSetAlignedFaction(bot,hash);
+            if(hash!=0 && type==PVPTYPE_COVERT) pvpMakeCovert(bot);
+            else if(hash!=0 && type==PVPTYPE_DECLARED) pvpMakeDeclared(bot);
+        }
+        boolean down=isDead(bot) || isIncapacitated(bot);
+        if(down) pclib.resurrectPlayer(bot);
+        setPostureClientImmediate(bot,POSTURE_UPRIGHT);
+        skill.recalcPlayerPools(bot,true);
+        setAttrib(bot,HEALTH,getMaxAttrib(bot,HEALTH));
+        setAttrib(bot,ACTION,getMaxAttrib(bot,ACTION));
+        boolean vars=hasObjVar(bot,TEST_VAR_ROOT),snapshots=hasObjVar(bot,SNAPSHOT_ROOT);
+        removeObjVar(bot,TEST_VAR_ROOT);
+        removeObjVar(bot,SNAPSHOT_ROOT);
+        removeObjVar(bot,RESET_ROOT);
+        StringBuilder sb=start(isDead(bot) || isIncapacitated(bot)?"refused":"ok");
+        kv(sb,"buffs_removed",buffs);kv(sb,"standings_restored",standings);kv(sb,"faction_restored",faction);
+        kv(sb,"was_down",down);kv(sb,"test_vars_cleared",vars);kv(sb,"snapshots_cleared",snapshots);
+        return sheet(sb,bot).toString();
     }
 }

@@ -4,7 +4,7 @@ Read-backs of pools, level, credits, faction, posture, profession and buffs; set
 the same through the libraries the server itself uses (respec for level and profession,
 factions for standing, money for credits, buff for buffs, healing/pclib for heal and revive).
 Every op acts only on the one registered non-god bot; nothing here can grant god mode or an
-admin level. Bounds below are the named caps of devtools/zones/fixtures/agent_character.java.
+admin level. `resetCharacter` undoes what these setters can undo (see docs/fixture-character.md). Bounds below are the named caps of devtools/zones/fixtures/agent_character.java.
 See docs/fixture-character.md.
 """
 import re
@@ -20,9 +20,13 @@ POSTURES = ("upright", "crouched", "prone", "sitting", "knocked_down")
 
 POOL_MAX = 500000          # health/action current and max
 LEVEL_MAX = 90             # rows of datatables/player/player_level
-CREDITS_MAX = 10000000     # cash or bank target / transfer amount
+CREDITS_MAX = 10000000     # cash or bank target / amount, and the cash plus bank total the Java enforces
 STANDING_MIN, STANDING_MAX = -5000, 50000   # factions.FACTION_RATING_MIN; the library clamps to the rank max
-BUFF_SECONDS_MAX = 86400
+BUFF_SECONDS_MAX = 3600    # one hour, well under a day
+# applyBuff: only these buff-table families (medic stat buffs; food, drink and foraged
+# consumables), and never a name containing a BUFF_DENY part (Java allowedBuff()).
+BUFF_PREFIXES = ("me_buff_", "drink_", "dish_", "dessert_", "foraged_")
+BUFF_DENY = ("immun", "invuln", "stasis", "god", "gm_", "admin")
 GIVE_COUNT_MAX = 25
 
 TYPES = {
@@ -83,6 +87,8 @@ OPS = {
     "equipItem": (("oid",), True),
     "unequipItem": (("oid",), True),
     "giveStaticCount": (("name", "char_count"), True),
+    # reset
+    "resetCharacter": ((), True),
 }
 
 # giveStaticCount creates objects: it needs an open scenario and tags what it creates.
@@ -105,5 +111,9 @@ def check(op, args):
             re.compile(pattern)
         except re.error:
             raise ValueError("revokeSkills: invalid pattern") from None
+    if op == "applyBuff":
+        name = args[0]
+        if any(part in name for part in BUFF_DENY) or not name.startswith(BUFF_PREFIXES):
+            raise ValueError("applyBuff: only " + ", ".join(p + "*" for p in BUFF_PREFIXES) + " buffs are allowed")
     if op == "setStanding" and args[0] in ("Neutral",):
         raise ValueError("setStanding: the Neutral faction has no player standing")
