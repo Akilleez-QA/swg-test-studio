@@ -515,6 +515,7 @@ hashes of every `agent_*.java` (`--check` only reports what is stale).
 | `equipItem` | `agent_character` | oid | yes | - |
 | `unequipItem` | `agent_character` | oid | yes | - |
 | `giveStaticCount` | `agent_character` | name, char_count | yes | required |
+| `resetCharacter` | `agent_character` | - | yes | - |
 | `bring` | `agent_multi` | role, bring_offset (optional) (argument 1 is a role) | yes | - |
 | `distanceTo` | `agent_multi` | role (argument 1 is a role) | no | - |
 | `groupOf` | `agent_multi` | role (optional) (argument 1 is a role) | no | - |
