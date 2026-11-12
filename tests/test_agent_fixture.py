@@ -88,7 +88,7 @@ class CommandTests(unittest.TestCase):
             (3, BOT, "grantSkills", ["a b"]),                       # space would split the console line
             (3, BOT, "describe", ["0"]),                            # not a valid oid
             (0, BOT, "inspect", []),                                # bad server id
-            (3, dict(BOT, character="Akilleez"), "inspect", []),    # not a fixture bot name
+            (3, dict(BOT, character="Someplayer"), "inspect", []),    # not a fixture bot name
             (3, BOT, "scale", ["1", "25"]),                         # beyond the fixture's 0.05..20
             (3, BOT, "transform", ["1", "0", "0", "400"]),          # yaw beyond 360
             (3, BOT, "itemBonuses", ["1", "luck=20000"]),           # bonus beyond 10000

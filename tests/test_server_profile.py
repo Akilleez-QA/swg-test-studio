@@ -25,7 +25,8 @@ from devtools.zones import restoration_console, server_profile
 from devtools.zones.studio_tool_bundle import verify
 
 ROOT = Path(__file__).resolve().parents[1]
-RESTORATION_TREE = Path(os.environ.get("SWG_RESTORATION_TREE", "/home/akilleez/LOCAL LLM/swg-december-2011"))
+# Tests that read a real server tree run only when SWG_RESTORATION_TREE names one.
+RESTORATION_TREE = Path(os.environ.get("SWG_RESTORATION_TREE") or "/nonexistent/restoration-tree")
 HAVE_TREE = (RESTORATION_TREE / "src/engine/server/application/CentralServer/Makefile.am").is_file()
 LEAN = TOOLS_ROOT / "zones/fixtures/restoration/protocol_bot.java"
 ORIGINAL = TOOLS_ROOT / "zones/fixtures/protocol_bot.java"

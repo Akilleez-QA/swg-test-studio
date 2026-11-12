@@ -152,7 +152,7 @@ collection_rewards, ship outfitting (prepareShips, makeShip, shipReport), house 
 
 ## Compile check
 
-Against `/home/akilleez/work/swg-wod-atmo-01/scriptgate-probe/gen-head-modern` with JDK 21
+Against a generated Dec 2011 script tree with JDK 21
 `javac -nowarn -implicit:none`, output is one `agent_fixture.class` with no nested classes.
 
 - The prescribed command, with `-encoding utf8`, fails before reaching our file. The

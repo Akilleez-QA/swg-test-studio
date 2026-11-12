@@ -6,13 +6,13 @@ fixture. A **server profile** names the tree and fixture Studio is driving:
 | profile | meaning |
 |---|---|
 | `whitengold` (default) | the original behaviour, unchanged |
-| `restoration` | a server built from a tree without zone instances, capacity consoles or the Test Studio recorder (our `swg-december-2011` tree) |
+| `restoration` | a server built from a tree without zone instances, capacity consoles or the Test Studio recorder (for example a Dec 2011 restoration of the public SWG-Source tree) |
 
 Select it with an optional key in the environment file:
 
 ```json
 {"schema_version": 1, "name": "Restoration fixture", "profile": "restoration",
- "server_checkout": "/path/to/swg-december-2011",
+ "server_checkout": "/path/to/server-checkout",
  "folder": "/tmp/swg-cold-test-0123abcd/client-012345abcdef",
  "binary": "/tmp/swg-driver64/driver", "bindings": {"actor": "tester"}}
 ```
