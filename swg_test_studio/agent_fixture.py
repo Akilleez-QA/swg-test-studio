@@ -745,6 +745,8 @@ def install(env, emit=print):
     classes = []
     with tempfile.TemporaryDirectory(prefix="swg-agent-fixture-") as tmp:
         tmp = Path(tmp)
+        # docker cp creates the last path element only; its parent must exist.
+        (tmp / "classpath").mkdir()
         run(["docker", "cp", f"{game}:{scripts}/.", str(tmp / "classpath" / "script")])
         release = class_release(tmp / "classpath" / "script" / "base_script.class")
         target = folder / "fixture" / "classes" / "script" / "fixture"
