@@ -39,9 +39,14 @@ public class agent_multi extends base_script {
     private static final String SNAPSHOT_RE="[a-z][a-z0-9_]{0,23}";
     private static final String AMOUNT_RE="[1-9][0-9]{0,6}";
     private static final int PAY_MAX=1000000;
-    // Snapshots live on the bot itself under this objvar tree, one subtree per name.
+    // Cash plus bank a bot may hold after payTo (agent_character.java CREDITS_MAX).
+    private static final int CREDITS_MAX=10000000;
+    // Snapshots live on the bot itself under this objvar tree, one subtree per name; one
+    // snapshot stores at most this many object ids in a single objvar array.
     private static final String SNAPSHOT_VAR="fixture.snapshot.";
-    private static final int SNAPSHOT_ITEMS_MAX=500;
+    private static final int SNAPSHOT_ITEMS_MAX=100;
+    // Objects a fixture op created carry this objvar (agent_scenario.java TAG_SCENARIO).
+    private static final String TAG_SCENARIO="fixture.scenario";
     // At most this many object ids are listed in one *_ids reply field.
     private static final int IDS_MAX=32;
 
@@ -210,6 +215,36 @@ public class agent_multi extends base_script {
         return who+":"+Integer.toUnsignedLong(getPlayerStationId(who))+":"+getPlayerFullName(who);
     }
 
+    /** Null when a cash plus bank total stays within CREDITS_MAX, else a refusal. */
+    private static String creditCap(long total) {
+        return total>CREDITS_MAX?"refused reason=credits-cap total="+total+" cap="+CREDITS_MAX:null;
+    }
+
+    /**
+     * True when the item's containment chain reaches the bot through the
+     * bot's inventory container: carried in the inventory (or a bag in it),
+     * not worn and not in the datapad, bank or mission bag.
+     */
+    private static boolean inInventory(obj_id bot,obj_id item) throws InterruptedException {
+        obj_id inventory=utils.getInventoryContainer(bot);
+        if(!isIdValid(inventory) || item.equals(inventory)) return false;
+        obj_id c=getContainedBy(item);
+        for(int i=0;i<CHAIN_MAX && isIdValid(c);i++) {
+            if(c.equals(inventory)) return bot.equals(getContainedBy(inventory));
+            if(c.equals(bot) || isPlayer(c)) return false;
+            c=getContainedBy(c);
+        }
+        return false;
+    }
+
+    /** True when the item or anything inside it was created by a fixture op (tagged fixture.scenario). */
+    private static boolean fixtureCreated(obj_id item) throws InterruptedException {
+        if(hasObjVar(item,TAG_SCENARIO)) return true;
+        obj_id[] inside=utils.getContents(item,true);
+        if(inside!=null) for(obj_id x:inside) if(isIdValid(x) && hasObjVar(x,TAG_SCENARIO)) return true;
+        return false;
+    }
+
     private static String who(obj_id x,obj_id bot,obj_id other) {
         if(!isIdValid(x)) return "none";
         if(x.equals(bot)) return "bot";
@@ -279,7 +314,8 @@ public class agent_multi extends base_script {
      * bring <partner> [offsetMeters 0.5..16, default 2]: moves the other bot
      * next to the acting bot (along +x, in the same cell when the bot is
      * indoors, on the terrain height outdoors). Both bots must be in the same
-     * scene; space scenes are refused.
+     * scene; space scenes are refused, and so is a partner that is dead,
+     * incapacitated or in combat.
      */
     public String bring(String value) throws InterruptedException {
         Object[] q=request(value,"bring",1,2);
@@ -293,6 +329,8 @@ public class agent_multi extends base_script {
             offset=args[1].matches(OFFSET_RE)?num(args[1],BRING_OFFSET_MIN,BRING_OFFSET_MAX):null;
             if(offset==null) return invalidArgs("offset");
         }
+        if(isDead(other) || isIncapacitated(other)) return fail("refused reason=partner-down");
+        if(getState(other,STATE_COMBAT)!=0) return fail("refused reason=partner-in-combat");
         String scene=getCurrentSceneName();
         if(scene==null || scene.startsWith("space_")) return fail("refused reason=space-scene scene="+enc(scene));
         location here=getLocation(bot),bw=getWorldLocation(bot),pw=getWorldLocation(other);
@@ -305,7 +343,7 @@ public class agent_multi extends base_script {
         StringBuilder sb=start(moved?"ok":"refused");
         kv(sb,"partner",other);kv(sb,"scene",scene);kv(sb,"offset",offset);
         kv(sb,"cell",isIdValid(here.cell)?here.cell:"none");
-        kv(sb,"distance",String.format("%.1f",getDistance(bot,other)));
+        kv(sb,"distance",String.format(java.util.Locale.ROOT,"%.1f",getDistance(bot,other)));
         return sb.toString();
     }
 
@@ -323,7 +361,7 @@ public class agent_multi extends base_script {
         boolean sameCell=bl!=null && pl!=null && isIdValid(bl.cell) && bl.cell.equals(pl.cell);
         StringBuilder sb=start("ok");
         kv(sb,"partner",other);
-        kv(sb,"distance",sameScene?String.format("%.1f",getDistance(bw,pw)):"none");
+        kv(sb,"distance",sameScene?String.format(java.util.Locale.ROOT,"%.1f",getDistance(bw,pw)):"none");
         kv(sb,"same_scene",sameScene);kv(sb,"bot_scene",bw==null?"none":bw.area);kv(sb,"partner_scene",pw==null?"none":pw.area);
         kv(sb,"same_building",bb!=null && bb.equals(pb));kv(sb,"same_cell",sameCell);
         return sb.toString();
@@ -378,20 +416,30 @@ public class agent_multi extends base_script {
      * groupLeave [partner]: the acting bot, or the partner, leaves its group
      * through the server's own group library (a queued leaveGroup command:
      * assert the outcome with a later groupOf). Already solo: ok, queued=false,
-     * so a suite can use it to arrange a solo start.
+     * so a suite can use it to arrange a solo start. Refused when the one
+     * leaving leads a group of more than two that has a member other than
+     * the bot and the named partner: leaving would hand leadership to a
+     * player the fixture does not control.
      */
     public String groupLeave(String value) throws InterruptedException {
         Object[] q=request(value,"groupLeave",0,1);
         if(q[0]!=null) return fail((String)q[0]);
         obj_id bot=(obj_id)q[1];String[] args=(String[])q[2];
-        obj_id target=bot;
+        obj_id other=null;
         if(args.length==1) {
             Object[] o=partner(bot,args[0]);
             if(o[0]!=null) return fail((String)o[0]);
-            target=(obj_id)o[1];
+            other=(obj_id)o[1];
         }
+        obj_id target=other==null?bot:other;
         obj_id g=getGroupObject(target);
         boolean grouped=isIdValid(g);
+        if(grouped && target.equals(getGroupLeaderId(g))) {
+            obj_id[] members=getGroupMemberIds(g);
+            if(members!=null && members.length>2) for(obj_id m:members)
+                if(isIdValid(m) && !m.equals(bot) && !m.equals(other))
+                    return fail("refused reason=would-hand-leadership member="+m);
+        }
         if(grouped) group.leaveGroup(target);
         StringBuilder sb=start("ok");
         kv(sb,"who",target.equals(bot)?"bot":"partner");kv(sb,"group",grouped?g:"none");kv(sb,"queued",grouped);
@@ -468,7 +516,7 @@ public class agent_multi extends base_script {
 
     /**
      * snapshot <name> [partner]: records cash, bank and the ids of every
-     * carried item (at most 500) of the bot, and of the partner when given,
+     * carried item (at most SNAPSHOT_ITEMS_MAX, 100) of the bot, and of the partner when given,
      * under objvar fixture.snapshot.<name> on each bot. Replaces an older
      * snapshot of that name.
      */
@@ -592,8 +640,12 @@ public class agent_multi extends base_script {
     // ------------------------------------------------------------------
 
     /**
-     * giveTo <partner> <itemOid>: moves an item the acting bot carries (in its
-     * inventory, not worn, not in a secure trade) into the partner's inventory.
+     * giveTo <partner> <itemOid>: moves an item the acting bot carries in its
+     * inventory (its containment chain goes through the inventory container:
+     * not worn, not in the datapad, bank or mission bag; not in a secure
+     * trade) into the partner's inventory. Refused for an item a fixture op
+     * created, or one holding such an item: it belongs to the giver's open
+     * scenario, whose scenarioEnd could no longer reach it.
      */
     public String giveTo(String value) throws InterruptedException {
         Object[] q=request(value,"giveTo",2,2);
@@ -606,10 +658,8 @@ public class agent_multi extends base_script {
         if(item==null) return invalidArgs("itemOid");
         String s=scope(bot,item,false);
         if(s!=null) return fail(s);
-        obj_id inventory=utils.getInventoryContainer(bot);
-        if(!bot.equals(utils.getContainingPlayer(item)) || item.equals(inventory))
-            return fail("out-of-scope reason=not-carried object="+item);
-        if(bot.equals(getContainedBy(item))) return fail("refused reason=equipped object="+item);
+        if(!inInventory(bot,item)) return fail("out-of-scope reason=not-in-inventory object="+item);
+        if(fixtureCreated(item)) return fail("refused reason=fixture-created object="+item);
         if(isInSecureTrade(item)) return fail("refused reason=in-trade object="+item);
         obj_id target=utils.getInventoryContainer(other);
         if(!isIdValid(target)) return fail("refused reason=no-inventory who=partner");
@@ -622,7 +672,8 @@ public class agent_multi extends base_script {
     /**
      * payTo <partner> <amount 1..1000000>: transfers cash from the acting bot
      * to the partner through the money library (asynchronous: assert with a
-     * later creditsOf or diff). Refused when the bot has too little cash.
+     * later creditsOf or diff). Refused when the bot has too little cash or
+     * the partner's cash plus bank would exceed CREDITS_MAX.
      */
     public String payTo(String value) throws InterruptedException {
         Object[] q=request(value,"payTo",2,2);
@@ -635,6 +686,8 @@ public class agent_multi extends base_script {
         if(amount==null) return invalidArgs("amount");
         int cash=getCashBalance(bot);
         if(cash<amount) return fail("refused reason=insufficient-cash cash="+cash);
+        String cap=creditCap((long)getCashBalance(other)+getBankBalance(other)+amount);
+        if(cap!=null) return fail(cap);
         boolean requested=money.cashTo(bot,other,amount);
         StringBuilder sb=start(requested?"ok":"refused");
         kv(sb,"partner",other);kv(sb,"amount",amount);kv(sb,"requested",requested);

@@ -15,7 +15,7 @@ from unittest import mock
 
 from swg_test_studio import agent_fixture as af
 from swg_test_studio import model
-from swg_test_studio.fixture_ops import multi
+from swg_test_studio.fixture_ops import character, multi
 from swg_test_studio.store import EXAMPLES, read_json
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -254,7 +254,8 @@ class JavaParityTests(unittest.TestCase):
         self.assertEqual(float(java_constant(JAVA, "BRING_OFFSET_MIN").rstrip("f")), multi.RANGES["bring_offset"][0])
         self.assertEqual(float(java_constant(JAVA, "BRING_OFFSET_MAX").rstrip("f")), multi.RANGES["bring_offset"][1])
         self.assertEqual(int(java_constant(JAVA, "PAY_MAX")), multi.RANGES["pay_amount"][1])
-        self.assertEqual(int(java_constant(JAVA, "SNAPSHOT_ITEMS_MAX")), 500)  # docs/fixture-multi.md
+        self.assertEqual(int(java_constant(JAVA, "SNAPSHOT_ITEMS_MAX")), 100)  # docs/fixture-multi.md
+        self.assertEqual(int(java_constant(JAVA, "CREDITS_MAX")), character.CREDITS_MAX)
 
     def test_seeded_faults_are_detected(self):
         dropped = JAVA.replace("Object[] o=partner(bot,args[0]);\n        if(o[0]!=null) return fail((String)o[0]);\n"
@@ -379,7 +380,8 @@ class ExampleTests(unittest.TestCase):
         with mock.patch.object(af, "REGISTRY", reg):
             model.validate(data, runnable=True)
             rows = af.scenario_ids([s for s in FULL_CONCERT if s["action"] == "agent_fixture"], reg)
-            self.assertEqual(rows, [{"id": "concert", "begun": ["open"], "ended": ["close"], "used": ["crate"]}])
+            self.assertEqual(rows, [{"id": "concert", "role": "actor", "begun": ["open"], "ended": ["close"],
+                                     "used": ["crate"], "problems": []}])
             # Seeded fault: the creating step without its scenario id is refused.
             broken = copy.deepcopy(data)
             del broken["steps"][4]["options"]["scenario"]

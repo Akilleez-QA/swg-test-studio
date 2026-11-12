@@ -53,24 +53,27 @@ A trailing `?` means optional.
 
 | op | args | changes state | reply keys | API used |
 |---|---|---|---|---|
-| `bring` | `role`, `bring_offset?` (default 2) | yes | `partner scene offset cell distance` | getCurrentSceneName, getLocation, getWorldLocation, getHeightAtLocation, setLocation, getDistance, isIdValid |
+| `bring` | `role`, `bring_offset?` (default 2) | yes | `partner scene offset cell distance` | isDead, isIncapacitated, getState (`STATE_COMBAT`), getCurrentSceneName, getLocation, getWorldLocation, getHeightAtLocation, setLocation, getDistance, isIdValid |
 | `distanceTo` | `role` | no | `partner distance same_scene bot_scene partner_scene same_building same_cell` | getWorldLocation, getLocation, getDistance, getTopMostContainer (botBuilding) |
 | `groupOf` | `role?` | no | `group size pc_size leader leader_is partner_group same_group`; rows `member,name,who,identity` | getGroupObject, getGroupLeaderId, getGroupSize, getPCGroupSize, getGroupMemberIds, getGroupMemberNames, getPlayerStationId, getPlayerFullName |
-| `groupLeave` | `role?` | yes | `who group queued` | getGroupObject, group.leaveGroup |
+| `groupLeave` | `role?` | yes | `who group queued` | getGroupObject, getGroupLeaderId, getGroupMemberIds, group.leaveGroup |
 | `creditsOf` | `role` | no | `partner cash bank total bot_cash bot_bank bot_total` | getCashBalance, getBankBalance, getTotalMoney |
 | `accountOf` | `role` | no | `bot_station partner_station same_account bot_name partner_name partner_identity` | getPlayerStationId, getPlayerFullName |
 | `tradeState` | `role?` | no | `bot_items_in_trade partner_items_in_trade`; rows `bot\|partner,oid,template` | utils.getContents, isInSecureTrade, getTemplateName |
 | `snapshot` | `snapshot_name`, `role?` | yes (objvars on the bots) | `snapshot items cash bank partner_items partner_cash partner_bank` | utils.getContents, getCashBalance, getBankBalance, setObjVar, removeObjVar, getIntObjVar |
 | `diff` | `snapshot_name`, `role?` | no | see below | hasObjVar, getIntObjVar, getObjIdArrayObjVar, utils.getContents, getCashBalance, getBankBalance, getTemplateName |
 | `snapshotDrop` | `snapshot_name`, `role?` | yes | `snapshot removed partner_removed` | hasObjVar, removeObjVar |
-| `giveTo` | `role`, `oid` | yes | `object partner container` | utils.getInventoryContainer, utils.getContainingPlayer, getContainedBy, isInSecureTrade, putIn (plus `scope`) |
-| `payTo` | `role`, `pay_amount` | yes | `partner amount requested bot_cash_before partner_cash_before` | getCashBalance, money.cashTo |
+| `giveTo` | `role`, `oid` | yes | `object partner container` | utils.getInventoryContainer, getContainedBy, isPlayer, hasObjVar, utils.getContents, isInSecureTrade, putIn (plus `scope`) |
+| `payTo` | `role`, `pay_amount` | yes | `partner amount requested bot_cash_before partner_cash_before` | getCashBalance, getBankBalance, money.cashTo |
 
 Details:
 
 - **bring** moves the *partner* next to the acting bot along +x. Indoors it goes in the bot's
   cell; outdoors at terrain height. It refuses when the partner is in another scene
-  (`out-of-scope reason=partner-scene`) and in `space_*` scenes (`refused reason=space-scene`).
+  (`out-of-scope reason=partner-scene`), in `space_*` scenes (`refused reason=space-scene`), and
+  when the partner is dead or incapacitated (`refused reason=partner-down`) or in combat
+  (`refused reason=partner-in-combat`): moving a downed or fighting player would hide what the
+  test is about to assert.
 - **groupOf** describes the acting bot's group. `leader_is` is `bot`, `partner`, `other` or
   `none`. `group=none` with `size=0` means solo. With a role it also gives `partner_group` and
   `same_group`. Member rows carry the `oid:station:name` identity for the bot and the partner;
@@ -78,8 +81,13 @@ Details:
 - **groupLeave** calls the server's own `group.leaveGroup`, which queues the `leaveGroup`
   command. The effect is asynchronous, so assert it with a later `groupOf`. A bot that is
   already solo answers `ok queued=false`, so a suite can use the op to arrange a solo start.
+  It refuses (`refused reason=would-hand-leadership member=<oid>`) when the one leaving leads a
+  group of more than two that has a member other than the acting bot and the named partner: the
+  group would pass leadership to a player the fixture does not control. Without a role only the
+  acting bot counts as known, so name the partner role when it is in the group too.
 - **snapshot** records cash, bank and the ids of everything the bot carries or wears
-  (recursive, at most `SNAPSHOT_ITEMS_MAX` = 500, otherwise `refused reason=too-many-items`)
+  (recursive, at most `SNAPSHOT_ITEMS_MAX` = 100, otherwise `refused reason=too-many-items`; the
+  ids go into one `obj_id[]` objvar, and 100 keeps that well inside an objvar's size)
   under objvar `fixture.snapshot.<name>` on the bot, and on the partner when given. It replaces
   an older snapshot of the same name.
 - **diff** compares against that snapshot (`refused reason=no-snapshot` when absent):
@@ -101,19 +109,28 @@ Details:
               "lost_ids": "<oid>", "items_conserved": "true", "credits_conserved": "true", "duplicated": "0"}}
   ```
 - **giveTo** moves an item the acting bot carries in its inventory into the partner's
-  inventory. It refuses a worn item (`refused reason=equipped`), an item in a secure trade
-  (`refused reason=in-trade`), the inventory itself, and anything not carried
-  (`out-of-scope reason=not-carried`).
+  inventory. The item's containment chain must reach the bot through the bot's inventory
+  container (directly or inside a bag); a worn item, anything in the datapad, bank or mission
+  bag, the inventory itself and anything not carried is `out-of-scope reason=not-in-inventory`.
+  It refuses an item in a secure trade (`refused reason=in-trade`) and an item a fixture op
+  created, or a container holding one (`refused reason=fixture-created`): such items belong to
+  the giver's open scenario, and in the partner's inventory the giver's `scenarioEnd` could not
+  reach them (it would report them as leaked). Arrange a partner's items with the partner's own
+  creating ops instead.
+- **payTo** also refuses when the partner's cash plus bank plus the amount would exceed
+  `CREDITS_MAX` (10,000,000, the character family's cap; `refused reason=credits-cap`).
 - **payTo** moves cash with the money library the server itself uses for cash transfers
   (`money.cashTo` → `transferCashTo`). The transfer is asynchronous: `requested=true` only
   means the request was accepted. Assert the result with `creditsOf` or `diff`. It refuses when
   the bot has less cash than the amount.
 
-Named caps: `BRING_OFFSET_MIN/MAX` 0.5 and 16 m, `PAY_MAX` 1,000,000, `SNAPSHOT_ITEMS_MAX` 500,
+Named caps: `BRING_OFFSET_MIN/MAX` 0.5 and 16 m, `PAY_MAX` 1,000,000, `CREDITS_MAX` 10,000,000,
+`SNAPSHOT_ITEMS_MAX` 100,
 `IDS_MAX` 32, `MAX_ROWS` 200.
 
 None of these ops creates world objects, so none is in `SCENARIO_OPS`. Snapshots are objvars
-on the bots themselves; remove them with `snapshotDrop`. No op changes scene
+on the bots themselves; remove them with `snapshotDrop` (the scenario family's `scenarioEnd` and the
+character family's `resetCharacter` also clear every `fixture.snapshot.*` of their bot). No op changes scene
 (`SCENE_CHANGING` is empty).
 
 ## Not possible from script
@@ -219,9 +236,12 @@ Every op has run only offline. In particular:
 - `money.cashTo` completing, its callbacks on the bot's own scripts, and a refusal when the
   partner's cash would overflow.
 - `isInSecureTrade` while a trade is open, and after it completes or is aborted.
-- `snapshot` objvar storage of an `obj_id[]` of up to 500 ids, and `diff` across a real trade:
+- `snapshot` objvar storage of an `obj_id[]` of up to 100 ids, and `diff` across a real trade:
   do traded items keep their object id?
-- `giveTo`'s `putIn` into another player's inventory, including a full inventory.
+- `giveTo`'s `putIn` into another player's inventory, including a full inventory; the inventory
+  chain walk for bags, the datapad and the bank.
+- `bring`'s down and combat refusals (`getState(..., STATE_COMBAT)` of a loaded player), and
+  `groupLeave`'s leadership check with members on another game server.
 - All three example suites end to end, which also needs DRV's held-session runner and trade peer
   commands.
 - The JDK 21 compile ran only in the job gate.
