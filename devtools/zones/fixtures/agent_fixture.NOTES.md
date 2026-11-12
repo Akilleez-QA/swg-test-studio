@@ -1,9 +1,9 @@
 # agent_fixture notes
 
 `script.fixture.agent_fixture` is the server-side fixture for ARRANGE and ASSERT steps on
-ordinary (non-god) protocol bots. It is ported from our personal-play console script
-`developer.claude.cli` (plus `give_static`). The trust in a hard-coded god character is
-gone. The guards follow the `identity()`/`player()` pattern in `protocol_bot.java`.
+ordinary (non-god) protocol bots. It is ported from an existing developer script in the
+server tree (a console script and its static-item helper). The trust in a hard-coded god
+character is gone. The guards follow the `identity()`/`player()` pattern in `protocol_bot.java`.
 
 Op families (`agent_<family>` classes) copy this class's guard and helpers verbatim; change
 them here only together with every family. How Studio finds, routes, runs and installs the
@@ -55,7 +55,7 @@ and end with `rows=N truncated=true|false`.
 | giveStatic | `<name,...>` (at most 25) | `static_item.createNewItemFunction` into the bot's inventory, only for names found in `master_item.iff` | mutating |
 | give | `<objectOid>` | `putIn` of an in-scope object into the bot's inventory | mutating |
 | completeCollection | `<bookName>` | completes every slot of one book from the cli allow-list of 14 player books | mutating |
-| clearDecor | `<buildingOid> <tag or *>` | destroys objects directly in the building's cells whose `claude.decor` objvar equals the tag (`*` = any tagged object). The bot must own the building. At most 500 per call | mutating |
+| clearDecor | `<buildingOid> <tag or *>` | destroys objects directly in the building's cells whose `fixture.decor` objvar equals the tag (`*` = any tagged object). The bot must own the building. At most 500 per call | mutating |
 
 ## Guard rules (every public method)
 
@@ -142,7 +142,7 @@ collection_rewards, ship outfitting (prepareShips, makeShip, shipReport), house 
   helper.
 - `layout`: port place_layout as a method that takes a layout from an allow-listed
   fixture directory (never a free path) into a building the bot owns, tagging pieces with
-  `claude.decor` so `clearDecor` can undo them.
+  `fixture.decor` so `clearDecor` can undo them.
 - `spawnPortal` / `configurePortal`: need the portal script attached to a created object.
   That conflicts with the no-attach rule unless the template and script come from a
   fixed allow-list.

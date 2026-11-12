@@ -4,8 +4,8 @@ import script.library.*;
 
 /**
  * Arrange/assert fixture for dedicated protocol bots in labelled copied
- * schemas only; never a role image. Ported from our personal-play console
- * script (developer.claude.cli) with its god-character trust removed.
+ * schemas only; never a role image. Ported from an existing developer
+ * console script in the server tree, with its god-character trust removed.
  *
  * Invoked through the CentralServer console:
  *   game <serverId> runScript fixture.agent_fixture <method> <oid>:<stationId>:<characterName> [typed args...]
@@ -33,7 +33,7 @@ public class agent_fixture extends base_script {
     private static final String INT_RE="-?[0-9]{1,9}";
     private static final String NAME_RE="[a-z0-9_]{1,64}";
     private static final String CELL_RE="[A-Za-z0-9_]{1,64}";
-    private static final String DECOR_TAG_VAR="claude.decor";
+    private static final String DECOR_TAG_VAR="fixture.decor";
     private static final int CLEAR_DECOR_MAX=500;
     private static final String EXPERTISE_TABLE="datatables/expertise/expertise.iff";
     private static final int EXPERTISE_TEST_TREE=99;
@@ -45,7 +45,7 @@ public class agent_fixture extends base_script {
         "saga_relic_book","slayer_book","space_book_01","space_book_02","weapon_book"
     };
     // Compiled draft schematic templates, tried in order. The first is the
-    // path developer.claude.cli used; the others are relative to the game
+    // path an existing developer script in the server tree uses; the others are relative to the game
     // server working directory of a standard swg-main checkout.
     private static final String[] DRAFT_SCHEMATIC_DIRS={
         "/opt/whitengold/data/sku.0/sys.server/compiled/game/object/draft_schematic",
@@ -249,7 +249,7 @@ public class agent_fixture extends base_script {
         int[] rc=new int[2];
         if(objects!=null) for(obj_id x:objects) {
             if(!isIdValid(x) || x.equals(bot)) continue;
-            row(sb,rc,x,String.format("%.1f",getDistance(bot,x)),getTemplateName(x));
+            row(sb,rc,x,String.format(java.util.Locale.ROOT,"%.1f",getDistance(bot,x)),getTemplateName(x));
         }
         return end(sb,rc);
     }
@@ -358,7 +358,7 @@ public class agent_fixture extends base_script {
     /**
      * tryPut <objectOid> <containerOid>: tries putIn and reports the volumes
      * and container types that explain a refusal. Mutates only on success
-     * (developer.claude.cli semantics).
+     * (the semantics of an existing developer script in the server tree).
      */
     public String tryPut(String value) throws InterruptedException {
         Object[] q=request(value,"tryPut",2,2);
@@ -681,7 +681,8 @@ public class agent_fixture extends base_script {
 
     /**
      * giveStatic <name,...>: creates master_item static items in the bot's
-     * inventory (developer.claude.give_static, done directly here). At most
+     * inventory (as an existing developer script in the server tree does,
+     * done directly here). At most
      * 25 names; each must be a row of the master item table.
      */
     public String giveStatic(String value) throws InterruptedException {
@@ -754,7 +755,7 @@ public class agent_fixture extends base_script {
 
     /**
      * clearDecor <buildingOid> <tag>: destroys every object directly in the
-     * building's cells that a layout tagged with this claude.decor tag ("*"
+     * building's cells that a layout tagged with this fixture.decor tag ("*"
      * for every tagged object). The bot must own the building. At most 500.
      */
     public String clearDecor(String value) throws InterruptedException {
