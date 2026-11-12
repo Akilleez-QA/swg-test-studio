@@ -20,7 +20,7 @@ Select it with an optional key in the environment file:
 Without the key the environment is a `whitengold` one (`swg_test_studio/backend.py:37`).
 The profile is bound once per process (`swg_test_studio/backend.py:113`) and handed to
 tool subprocesses in `SWG_STUDIO_SERVER_PROFILE` (`devtools/zones/server_profile.py:14`,
-`:143`). All constants live in `devtools/zones/server_profile.py`.
+`:169`). All constants live in `devtools/zones/server_profile.py`.
 
 **Status: nothing here has run against a live server.** No restoration test server
 exists yet; the profile is covered by offline tests and a compile check only.
@@ -29,15 +29,15 @@ exists yet; the profile is covered by offline tests and a compile check only.
 
 | area | whitengold | restoration | where |
 |---|---|---|---|
-| per-run source hashes | fixed WhiteNGold list, raises on a missing file | the profile's own list; a missing file is recorded as `"absent"` | `devtools/zones/protocol_test_sets.py:31`, `:43`; lists at `devtools/zones/server_profile.py:54`, `:93` |
+| per-run source hashes | fixed WhiteNGold list, raises on a missing file | the profile's own list; a missing file is recorded as `"absent"` | `devtools/zones/protocol_test_sets.py:31`, `:43`; lists at `devtools/zones/server_profile.py:55`, `:118` |
 | bot fixture script | `fixtures/protocol_bot.java` | `fixtures/restoration/protocol_bot.java` (read-only `inspect`; `instance=none`) | `devtools/zones/fixtures/restoration/protocol_bot.java:40`, `:53` |
 | bot query transport | `/fixture/protocol-bot-console` binary in the central container | one typed `ConGenericMessage` from the host to Central's private console port | `devtools/zones/protocol_driver.py:143`; `devtools/zones/restoration_console.py:32` |
 | game servers considered | scenes in the instance catalog | every `Adding server N for scene X` line | `devtools/zones/protocol_driver.py:133` |
 | saved-state query | reads `objects.zone_instance_id` | no such column; `instance` is the constant `none` | `devtools/zones/protocol_driver.py:113` |
 | readiness | capacity console (`capacityScenes`/`capacityInstances`) or the stage 5 preload check | login ready line, then a registered game server for each bound bot's saved scene | `swg_test_studio/docker_runtime.py:225`, `:338` |
 | start of a stopped server | journal maintenance first | no journal step | `swg_test_studio/docker_runtime.py:359` |
-| install root in containers | `/opt/whitengold` | `/opt/restoration` | `devtools/zones/server_profile.py:109` |
-| checkout sub-folder (lock, image pins, registered setups) | `StarWarsGalaxies` | `StudioTestServer` | `devtools/zones/server_profile.py:109`; `swg_test_studio/setup.py:14` |
+| install root in containers | `/opt/whitengold` | `/opt/restoration` | `devtools/zones/server_profile.py:134` |
+| checkout sub-folder (lock, image pins, registered setups) | `StarWarsGalaxies` | `StudioTestServer` | `devtools/zones/server_profile.py:134`; `swg_test_studio/setup.py:14` |
 | `install-agent-fixture` | compiles `agent_fixture.java` | compiles the lean `protocol_bot.java` and `agent_fixture.java` | `swg_test_studio/agent_fixture.py:329` |
 
 Not changed by the profile: every isolation check below.
@@ -50,15 +50,17 @@ answer without an environment (`swg_test_studio/cli.py:57`). The driver repeats 
 for its own options (`devtools/zones/protocol_driver.py:448`).
 
 - `session` steps with only `role`, `create`, `disconnect`, `expect_scene`
-  (`devtools/zones/server_profile.py:113`): the bundled `login_relogin` and `create_character`.
-- `agent_fixture` steps (`devtools/zones/server_profile.py:112`).
+  (`devtools/zones/server_profile.py:138`): the bundled `login_relogin` and `create_character`.
+- `agent_fixture` steps (`devtools/zones/server_profile.py:137`).
 
-Group steps (`action_sequence`, `ship_group`, `group_affinity_*`) stay refused for a real reason: they need the
-Tansaari station or an Ord ship and whitengold-only staging (`devtools/zones/studio_actions.py:99-103`). The typed
-`client` steps (group, secure trade and held sessions; `docs/fixture-client-actions.md`) need no station. They
-compile to `client_action` cases, which this profile does not list yet: the held-session runner and the trade peer
-commands are still to land with a refresh of `devtools/studio-tools.json`. Until then a `client` step is refused here
-like any other unsupported step.
+- `client` steps (held sessions, group, secure trade and tell; `docs/fixture-client-actions.md`): `client_action`
+  is in `case_kinds` and every client kind in `client_kinds` (`devtools/zones/server_profile.py:137-140`). The
+  bundled `trade_between_accounts`, `group_with_fixture_asserts`, `scenario_concert`, `trade_two_accounts_client`
+  and `group_invite_accept_client` plan under this profile.
+
+Group steps of the older kinds (`action_sequence`, `ship_group`, `group_affinity_*`) stay refused for a real
+reason: they need the Tansaari station or an Ord ship and whitengold-only staging
+(`devtools/zones/studio_actions.py:99-103`). The typed `client` group steps need no station.
 
 ## What a prepared restoration test server must provide
 
@@ -142,11 +144,13 @@ whitengold profile makes, unless marked *(profile)*.
   and overlay entrypoint come from WhiteNGold tools that are not ported. Somebody has to
   produce a server meeting the list above.
 - **Install root and deployment folder are our choice.** `/opt/restoration` and
-  `StudioTestServer` are placeholders in one place (`devtools/zones/server_profile.py:109`);
+  `StudioTestServer` are placeholders in one place (`devtools/zones/server_profile.py:134`);
   the `lib`/`jvm` layout under the root is assumed to mirror WhiteNGold's.
-- **Driver peer.** `protocol_driver64.cpp` is unchanged and its build script is not in
-  this bundle. Every engine header it includes exists in the restoration tree, but it has
-  not been built or run against it.
+- **Driver peer.** Its build script is not in this bundle. The unmodified peer does not
+  compile against the restoration tree (one error: that tree's `CreateProjectileMessage`
+  takes a ship id first). Built with `-DSWG_STUDIO_PROFILE_RESTORATION`, which compiles out
+  the ship `fire` action, it compiles and links against the tree's shared libraries
+  (`docs/fixture-client-actions.md`, "Build and compile check"). It has not run against a server.
 - **Fixture compile.** With JDK 21, `-sourcepath` on the tree's script sources alone
   fails: 126 of 168 libraries have no `.java` twin (only `.scriptlib`), so imports inside
   the existing library twins do not resolve (148 errors, none in the fixtures), and
@@ -166,7 +170,7 @@ whitengold profile makes, unless marked *(profile)*.
 
 ## Deliberately unsupported
 
-Refused by `plan`/`validate` (`devtools/zones/server_profile.py:170`): shuttle and terminal
+Refused by `plan`/`validate` (`devtools/zones/server_profile.py:199`): shuttle and terminal
 sessions (`stage_station`, `prepare_terminal`, `expect_family`, `answer`), journeys, action
 sequences (ships, groups, launch/land), every saved recipe including `driver_unit`, and all
 instance, capacity, encounter, retirement and hosted-content suites. Recording is refused

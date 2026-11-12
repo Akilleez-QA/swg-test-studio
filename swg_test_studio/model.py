@@ -13,9 +13,11 @@ SESSION_OPTIONS = {"create": bool, "disconnect": bool, "prepare_terminal": bool,
                    "answer": str}
 
 # Client-side actions of a held protocol peer (docs/fixture-client-actions.md). Each kind names the fields it
-# takes besides "role" and "kind". Every kind is grounded in the server tree: group kinds are rows of the
-# command table sent as a command-queue request, trade kinds are the secure-trade messages the game server's
-# Client and CreatureController handle. CLIENT_WIRE records that grounding; tests check it against the tree.
+# takes besides "role" and "kind" (and the optional "expect" and "timeout"). Every kind is grounded in the server
+# tree: group kinds are rows of the command table sent as a command-queue request, trade kinds are the
+# secure-trade messages the game server's Client and CreatureController handle, and a tell is the chat message
+# the connection server forwards to the chat server. CLIENT_WIRE records that grounding; tests check it against
+# the tree.
 CLIENT_KINDS = {
     "session_hold": (), "session_release": (),
     "group_invite": ("peer",), "group_join": ("peer",), "group_decline": (), "group_uninvite": ("peer",),
@@ -23,7 +25,10 @@ CLIENT_KINDS = {
     "trade_request": ("peer",), "trade_accept": (), "trade_deny": (),
     "trade_add_item": ("item",), "trade_credits": ("amount",),
     "trade_offer": (), "trade_unoffer": (), "trade_verify": (), "trade_reject": (), "trade_cancel": (),
+    "tell": ("peer", "text"),
 }
+# trade_add_item names its object either literally ("item") or as a row of an earlier createInInventory step.
+CLIENT_ALTERNATIVES = {"trade_add_item": (("item",), ("item_from",))}
 CLIENT_WIRE = {
     "session_hold": ("peer", "login"), "session_release": ("message", "LogoutMessage"),
     "group_invite": ("command", "invite"), "group_join": ("command", "join"),
@@ -36,8 +41,32 @@ CLIENT_WIRE = {
     "trade_offer": ("message", "AcceptTransactionMessage"), "trade_unoffer": ("message", "UnAcceptTransactionMessage"),
     "trade_verify": ("message", "VerifyTradeMessage"), "trade_reject": ("message", "DenyTradeMessage"),
     "trade_cancel": ("message", "AbortTradeMessage"),
+    "tell": ("chat", "ChatInstantMessageToCharacter"),
+}
+# The peer's request verb for each kind (protocol_driver64.cpp, Driver::request).
+CLIENT_VERB = {
+    "group_invite": "groupInvite", "group_join": "groupJoin", "group_decline": "groupDecline",
+    "group_uninvite": "groupUninvite", "group_leave": "groupLeave", "group_disband": "groupDisband",
+    "group_make_leader": "groupMakeLeader", "group_dismiss": "groupDismiss",
+    "trade_request": "tradeRequest", "trade_accept": "tradeAccept", "trade_deny": "tradeDeny",
+    "trade_add_item": "tradeItem", "trade_credits": "tradeCredits", "trade_offer": "tradeOffer",
+    "trade_unoffer": "tradeUnoffer", "trade_verify": "tradeVerify", "trade_reject": "tradeReject",
+    "trade_cancel": "tradeCancel", "tell": "tell",
 }
 CLIENT_ITEM = re.compile(r"[1-9][0-9]{0,18}\Z")
+CLIENT_TELL = re.compile(r"[\x21-\x7e](?:[\x20-\x7e]{0,198}[\x21-\x7e])?\Z")  # printable ASCII, 1-200, no edge spaces
+CLIENT_STRING_ID = r"[a-z0-9_]{1,64}:[a-z0-9_]{1,64}"
+# Optional typed expectations on a client step's observations (docs/fixture-client-actions.md):
+# key -> (value pattern, kinds it applies to; None: every kind except the session ones).
+GROUP_KINDS = frozenset(k for k in CLIENT_KINDS if k.startswith("group_"))
+CLIENT_EXPECT = {
+    "status": (r"[0-9]{1,5}", GROUP_KINDS),          # command_result status of the queued command (default 0)
+    "result": (r"[0-9]{1,5}", frozenset({"tell"})),  # ChatOnSendInstantMessage result (default 0)
+    "actor_message": (CLIENT_STRING_ID, None),       # a system message string id the acting role receives
+    "peer_message": (CLIENT_STRING_ID, None),        # one the peer (or trade partner) receives
+}
+CLIENT_TIMEOUT = (5, 120)    # seconds one client step may wait for its observations; default 30
+ITEM_SOURCES = frozenset({"createInInventory"})  # agent_fixture ops whose reply rows start with a created object ID
 TRADE_CREDITS_MAX = 1000000  # GiveMoneyMessage carries an int; the server ignores a negative amount
 MAX_HELD_SESSIONS = 5        # one held peer per declared role; a suite declares at most five roles
 
@@ -46,8 +75,11 @@ def validate_client(options, roles):
     """One typed client action; the order rules across steps are checked by client_order."""
     kind = options.get("kind") if isinstance(options, dict) else None
     if not isinstance(kind, str) or kind not in CLIENT_KINDS:
-        raise ValueError("Unknown client action; only the typed group, trade and session actions are supported")
-    exact(options, ("role", "kind") + CLIENT_KINDS[kind], "client action")
+        raise ValueError("Unknown client action; only the typed group, trade, tell and session actions are supported")
+    optional = tuple(key for key in ("expect", "timeout") if key in options)
+    shapes = CLIENT_ALTERNATIVES.get(kind, (CLIENT_KINDS[kind],))
+    if not any(set(options) == {"role", "kind"} | set(shape) | set(optional) for shape in shapes):
+        raise ValueError("Unknown or missing client action fields")
     if options["role"] not in roles:
         raise ValueError("Client actions need a declared role")
     if "peer" in options and (not isinstance(options["peer"], str) or options["peer"] not in roles or
@@ -55,9 +87,33 @@ def validate_client(options, roles):
         raise ValueError("A client action's peer must be a different declared role")
     if "item" in options and (not isinstance(options["item"], str) or not CLIENT_ITEM.fullmatch(options["item"])):
         raise ValueError("A traded item is one object ID")
+    if "item_from" in options:
+        source = options["item_from"]
+        if (not isinstance(source, dict) or set(source) != {"step", "row"} or not isinstance(source["step"], str) or
+                not NAME.fullmatch(source["step"]) or type(source["row"]) is not int or not 0 <= source["row"] <= 9):
+            raise ValueError("item_from names an earlier step id and a reply row 0-9")
     if "amount" in options and (type(options["amount"]) is not int or
                                 not 0 < options["amount"] <= TRADE_CREDITS_MAX):
         raise ValueError(f"Trade credits must be a whole number from 1 to {TRADE_CREDITS_MAX}")
+    if "text" in options and (not isinstance(options["text"], str) or not CLIENT_TELL.fullmatch(options["text"])):
+        raise ValueError("A tell is 1-200 printable ASCII characters without leading or trailing spaces")
+    if "timeout" in options and (type(options["timeout"]) is not int or
+                                 not CLIENT_TIMEOUT[0] <= options["timeout"] <= CLIENT_TIMEOUT[1]):
+        raise ValueError(f"A client step timeout is {CLIENT_TIMEOUT[0]}-{CLIENT_TIMEOUT[1]} seconds")
+    if "expect" in options:
+        expect = options["expect"]
+        if kind.startswith("session_") or not isinstance(expect, dict) or not 1 <= len(expect) <= len(CLIENT_EXPECT):
+            raise ValueError("expect maps typed observation keys to exact values")
+        for key, value in expect.items():
+            if key not in CLIENT_EXPECT:
+                raise ValueError("Unknown client expectation: " + str(key))
+            pattern, kinds = CLIENT_EXPECT[key]
+            if kinds is not None and kind not in kinds:
+                raise ValueError(f"Expectation {key} does not apply to {kind}")
+            if not isinstance(value, str) or not re.fullmatch(pattern, value):
+                raise ValueError(f"Expectation {key} needs a value matching {pattern}")
+        if "peer_message" in expect and "peer" not in CLIENT_KINDS[kind] and not kind.startswith("trade_"):
+            raise ValueError("peer_message needs a step with a peer or an open trade")
     return options
 
 
@@ -83,7 +139,9 @@ def client_order(steps):
             for r in rest:
                 leader_of[r] = new
 
+    earlier = {}
     for step in steps:
+        earlier[step["id"]] = step
         if step["action"] == "session" and step["options"].get("role") in held:
             raise ValueError("A held role cannot also run a separate session step until it is released")
         if step["action"] != "client":
@@ -133,6 +191,8 @@ def client_order(steps):
                         leader_of[r] = peer
                 else:
                     drop(peer)
+        elif kind == "tell":
+            pass  # a tell needs only both sessions; it changes no group or trade state
         elif kind == "trade_request":
             require(trade is None and not any(peer in t for t in trades), "Each role trades with one peer at a time")
             trades[(actor, peer)] = {"state": "requested", "offered": set(), "verified": set()}
@@ -149,6 +209,11 @@ def client_order(steps):
                 del trades[trade]
             else:
                 require(row["state"] == "trading", "The trade has not been accepted yet")
+                if kind == "trade_add_item" and "item_from" in o:
+                    source = earlier.get(o["item_from"]["step"])
+                    require(source is not None and source is not step and source["action"] == "agent_fixture" and
+                            source["options"]["op"] in ITEM_SOURCES and source["options"]["role"] == actor,
+                            "item_from must name an earlier createInInventory step of the trading role")
                 if kind in ("trade_add_item", "trade_credits", "trade_unoffer", "trade_reject"):
                     row["offered"].clear()
                     row["verified"].clear()

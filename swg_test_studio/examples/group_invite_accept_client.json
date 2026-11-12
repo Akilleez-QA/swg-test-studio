@@ -1,0 +1,26 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "group_invite_accept_client",
+  "title": "Two held client sessions: invite declined, invite accepted, a tell, disband, asserted from the server side",
+  "category": "functional", "roles": ["leader", "member"],
+  "steps": [
+    {"id": "hold_leader", "action": "client", "options": {"role": "leader", "kind": "session_hold"}},
+    {"id": "hold_member", "action": "client", "options": {"role": "member", "kind": "session_hold"}},
+    {"id": "other_account", "action": "agent_fixture", "options": {"role": "leader", "op": "accountOf", "args": ["member"], "expect": {"same_account": "false"}}},
+    {"id": "leader_solo", "action": "agent_fixture", "options": {"role": "leader", "op": "groupLeave", "args": []}},
+    {"id": "member_solo", "action": "agent_fixture", "options": {"role": "leader", "op": "groupLeave", "args": ["member"]}},
+    {"id": "meet", "action": "agent_fixture", "options": {"role": "leader", "op": "bring", "args": ["member", "3"]}},
+    {"id": "invite", "action": "client", "options": {"role": "leader", "kind": "group_invite", "peer": "member"}},
+    {"id": "decline", "action": "client", "options": {"role": "member", "kind": "group_decline"}},
+    {"id": "still_solo", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"same_group": "false"}}},
+    {"id": "invite_again", "action": "client", "options": {"role": "leader", "kind": "group_invite", "peer": "member"}},
+    {"id": "join", "action": "client", "options": {"role": "member", "kind": "group_join", "peer": "leader"}},
+    {"id": "grouped", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"same_group": "true", "size": "2", "leader_is": "bot"}}},
+    {"id": "hello", "action": "client", "options": {"role": "leader", "kind": "tell", "peer": "member", "text": "Welcome to the group"}},
+    {"id": "disband", "action": "client", "options": {"role": "leader", "kind": "group_disband"}},
+    {"id": "dissolved", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"group": "none", "partner_group": "none", "same_group": "false"}}},
+    {"id": "release_leader", "action": "client", "options": {"role": "leader", "kind": "session_release"}},
+    {"id": "release_member", "action": "client", "options": {"role": "member", "kind": "session_release"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}
