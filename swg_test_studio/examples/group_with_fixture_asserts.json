@@ -1,0 +1,26 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "group_with_fixture_asserts",
+  "title": "Invite, join, hand over leadership and leave, asserted from the server side",
+  "category": "functional", "roles": ["leader", "member"],
+  "steps": [
+    {"id": "hold_leader", "action": "client", "options": {"role": "leader", "kind": "session_hold"}},
+    {"id": "hold_member", "action": "client", "options": {"role": "member", "kind": "session_hold"}},
+    {"id": "other_account", "action": "agent_fixture", "options": {"role": "leader", "op": "accountOf", "args": ["member"], "expect": {"same_account": "false"}}},
+    {"id": "leader_solo", "action": "agent_fixture", "options": {"role": "leader", "op": "groupLeave", "args": []}},
+    {"id": "member_solo", "action": "agent_fixture", "options": {"role": "leader", "op": "groupLeave", "args": ["member"]}},
+    {"id": "meet", "action": "agent_fixture", "options": {"role": "leader", "op": "bring", "args": ["member", "3"]}},
+    {"id": "close_enough", "action": "agent_fixture", "options": {"role": "leader", "op": "distanceTo", "args": ["member"], "expect": {"same_scene": "true"}}},
+    {"id": "solo_before", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"group": "none", "same_group": "false"}}},
+    {"id": "invite", "action": "client", "options": {"role": "leader", "kind": "group_invite", "peer": "member"}},
+    {"id": "join", "action": "client", "options": {"role": "member", "kind": "group_join", "peer": "leader"}},
+    {"id": "grouped", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"same_group": "true", "size": "2", "pc_size": "2", "leader_is": "bot"}}},
+    {"id": "hand_over", "action": "client", "options": {"role": "leader", "kind": "group_make_leader", "peer": "member"}},
+    {"id": "new_leader", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"same_group": "true", "leader_is": "partner"}}},
+    {"id": "leave", "action": "client", "options": {"role": "leader", "kind": "group_leave"}},
+    {"id": "dissolved", "action": "agent_fixture", "options": {"role": "leader", "op": "groupOf", "args": ["member"], "expect": {"group": "none", "partner_group": "none", "same_group": "false"}}},
+    {"id": "release_leader", "action": "client", "options": {"role": "leader", "kind": "session_release"}},
+    {"id": "release_member", "action": "client", "options": {"role": "member", "kind": "session_release"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

@@ -103,7 +103,8 @@ class StoreTests(unittest.TestCase):
             data["title"] = "Changed title"
             library.save(data, replace=True)
             self.assertEqual(library.get("my_login")["title"], "Changed title")
-            self.assertEqual(len(library.list()), 11)
+            # Every bundled example plus the one saved suite; derived so a new example needs no edit here.
+            self.assertEqual(len(library.list()), len(list(EXAMPLES.glob("*.json"))) + 1)
 
     def test_path_traversal_never_reads_a_file(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -196,7 +197,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(main(["--workspace", temporary, "list"]), 0)
             value = json.loads(output.getvalue())
-            self.assertEqual(len(value["suites"]), 10)
+            self.assertEqual(len(value["suites"]), len(list(EXAMPLES.glob("*.json"))))
             output.seek(0)
             output.truncate()
             self.assertEqual(main(["--workspace", temporary, "validate", "login_relogin"]), 0)

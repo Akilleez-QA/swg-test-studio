@@ -1,0 +1,28 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "trade_between_accounts",
+  "title": "Secure trade of credits between two accounts, asserted from the server side",
+  "category": "functional", "roles": ["seller", "buyer"],
+  "steps": [
+    {"id": "hold_seller", "action": "client", "options": {"role": "seller", "kind": "session_hold"}},
+    {"id": "hold_buyer", "action": "client", "options": {"role": "buyer", "kind": "session_hold"}},
+    {"id": "other_account", "action": "agent_fixture", "options": {"role": "seller", "op": "accountOf", "args": ["buyer"], "expect": {"same_account": "false"}}},
+    {"id": "meet", "action": "agent_fixture", "options": {"role": "seller", "op": "bring", "args": ["buyer", "2"]}},
+    {"id": "fund_buyer", "action": "agent_fixture", "options": {"role": "seller", "op": "payTo", "args": ["buyer", "500"], "expect": {"requested": "true"}}},
+    {"id": "funded", "action": "agent_fixture", "options": {"role": "seller", "op": "creditsOf", "args": ["buyer"]}},
+    {"id": "before_trade", "action": "agent_fixture", "options": {"role": "seller", "op": "snapshot", "args": ["trade1", "buyer"]}},
+    {"id": "request", "action": "client", "options": {"role": "seller", "kind": "trade_request", "peer": "buyer"}},
+    {"id": "accept", "action": "client", "options": {"role": "buyer", "kind": "trade_accept"}},
+    {"id": "pay", "action": "client", "options": {"role": "buyer", "kind": "trade_credits", "amount": 500}},
+    {"id": "offer_seller", "action": "client", "options": {"role": "seller", "kind": "trade_offer"}},
+    {"id": "offer_buyer", "action": "client", "options": {"role": "buyer", "kind": "trade_offer"}},
+    {"id": "verify_seller", "action": "client", "options": {"role": "seller", "kind": "trade_verify"}},
+    {"id": "verify_buyer", "action": "client", "options": {"role": "buyer", "kind": "trade_verify"}},
+    {"id": "trade_closed", "action": "agent_fixture", "options": {"role": "seller", "op": "tradeState", "args": ["buyer"], "expect": {"bot_items_in_trade": "0", "partner_items_in_trade": "0"}}},
+    {"id": "after_trade", "action": "agent_fixture", "options": {"role": "seller", "op": "diff", "args": ["trade1", "buyer"], "expect": {"cash_delta": "500", "partner_cash_delta": "-500", "bank_delta": "0", "partner_bank_delta": "0", "credits_conserved": "true", "items_conserved": "true", "duplicated": "0"}}},
+    {"id": "drop_snapshot", "action": "agent_fixture", "options": {"role": "seller", "op": "snapshotDrop", "args": ["trade1", "buyer"]}},
+    {"id": "release_seller", "action": "client", "options": {"role": "seller", "kind": "session_release"}},
+    {"id": "release_buyer", "action": "client", "options": {"role": "buyer", "kind": "session_release"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}

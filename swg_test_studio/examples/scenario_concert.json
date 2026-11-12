@@ -1,0 +1,24 @@
+{
+  "format": "swg-test-studio", "schema_version": 1,
+  "id": "scenario_concert",
+  "title": "Client and server steps in concert: arrange, act, assert and clean up",
+  "category": "functional", "roles": ["actor", "helper"],
+  "steps": [
+    {"id": "hold_actor", "action": "client", "options": {"role": "actor", "kind": "session_hold"}},
+    {"id": "hold_helper", "action": "client", "options": {"role": "helper", "kind": "session_hold"}},
+    {"id": "arrange_spot", "action": "agent_fixture", "options": {"role": "actor", "op": "warp", "args": ["100", "0", "-200"]}},
+    {"id": "arrange_helper", "action": "agent_fixture", "options": {"role": "actor", "op": "bring", "args": ["helper", "2"]}},
+    {"id": "arrange_solo", "action": "agent_fixture", "options": {"role": "actor", "op": "groupLeave", "args": []}},
+    {"id": "before", "action": "agent_fixture", "options": {"role": "actor", "op": "snapshot", "args": ["concert", "helper"]}},
+    {"id": "invite", "action": "client", "options": {"role": "actor", "kind": "group_invite", "peer": "helper"}},
+    {"id": "join", "action": "client", "options": {"role": "helper", "kind": "group_join", "peer": "actor"}},
+    {"id": "where", "action": "agent_fixture", "options": {"role": "actor", "op": "inspect", "args": [], "expect": {"world_x": "100.0", "world_z": "-200.0", "god": "false"}}},
+    {"id": "grouped", "action": "agent_fixture", "options": {"role": "actor", "op": "groupOf", "args": ["helper"], "expect": {"same_group": "true", "leader_is": "bot"}}},
+    {"id": "nothing_moved", "action": "agent_fixture", "options": {"role": "actor", "op": "diff", "args": ["concert", "helper"], "expect": {"gained": "0", "lost": "0", "partner_gained": "0", "partner_lost": "0", "credits_conserved": "true"}}},
+    {"id": "disband", "action": "client", "options": {"role": "actor", "kind": "group_disband"}},
+    {"id": "clean_up", "action": "agent_fixture", "options": {"role": "actor", "op": "snapshotDrop", "args": ["concert", "helper"]}},
+    {"id": "release_actor", "action": "client", "options": {"role": "actor", "kind": "session_release"}},
+    {"id": "release_helper", "action": "client", "options": {"role": "helper", "kind": "session_release"}}
+  ],
+  "review": {"approved": true, "recording": null, "unsupported": []}
+}
