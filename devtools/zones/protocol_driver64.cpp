@@ -45,6 +45,12 @@
 #include "sharedNetworkMessages/LogoutMessage.h"
 #include "sharedNetworkMessages/ChatSystemMessage.h"
 #include "sharedNetworkMessages/ErrorMessage.h"
+#include "sharedNetworkMessages/MessageQueueSecureTrade.h"
+#include "sharedNetworkMessages/SecureTradeMessages.h"
+#include "sharedNetworkMessages/ChatAvatarId.h"
+#include "sharedNetworkMessages/ChatInstantMessageToCharacter.h"
+#include "sharedNetworkMessages/ChatInstantMessageToClient.h"
+#include "sharedNetworkMessages/ChatOnSendInstantMessage.h"
 #include "sharedGame/SuiWidgetProperty.h"
 #include "sharedGame/SuiEventType.h"
 #include "UnicodeUtils.h"
@@ -88,6 +94,76 @@ public:
     Archive::AutoVariable<NetworkId> id;Archive::AutoVariable<real> value;
 };
 NetworkSetupData udpSetup() {NetworkSetupData data;data.useTcp=false;return data;}
+uint32 const clientControllerFlags=GameControllerMessageFlags::SEND|GameControllerMessageFlags::RELIABLE|GameControllerMessageFlags::DEST_AUTH_SERVER;
+// One typed client action (docs/fixture-client-actions.md). Every message is a class of the
+// server tree, built as the reference client builds it; nothing here is a free-form command.
+struct ClientAction {
+    ClientAction():amount(0) {}
+    std::string verb;NetworkId target;std::string targetName;std::string text;int amount;
+};
+// Owns the message (and a controller payload) that one client action sends.
+class Outgoing {
+public:
+    Outgoing():message(0),payload(0) {}
+    ~Outgoing() {delete message;delete payload;}
+    GameNetworkMessage *message;MessageQueue::Data *payload;std::string command;
+private:
+    Outgoing(Outgoing const &);Outgoing &operator=(Outgoing const &);
+};
+bool tellText(std::string const &text) {
+    if(text.empty()||text.size()>200||text[0]==' '||text[text.size()-1]==' ')return false;
+    for(size_t i=0;i<text.size();++i)if(text[i]<32||text[i]>126)return false;
+    return true;
+}
+// Command-table rows sent through the command queue, exactly as the peer's existing group
+// actions send them (MessageQueueCommandQueueEnqueue on CM_commandQueueEnqueue).
+char const *queuedCommand(std::string const &verb) {
+    static char const *const table[][2]={{"groupInvite","invite"},{"groupJoin","join"},{"groupDecline","decline"},
+        {"groupUninvite","uninvite"},{"groupLeave","leaveGroup"},{"groupDisband","disband"},
+        {"groupMakeLeader","makeLeader"},{"groupDismiss","dismissGroupMember"}};
+    for(size_t i=0;i<sizeof table/sizeof table[0];++i)if(verb==table[i][0])return table[i][1];
+    return 0;
+}
+bool buildClientAction(ClientAction const &a,NetworkId const &character,uint32 sequence,Outgoing &out) {
+    if(!character.isValid())return false;
+    if(char const *name=queuedCommand(a.verb)) {
+        // invite names its target by character name (the peer's existing invite); decline,
+        // leave and disband take no target; the others name the companion's object.
+        bool const named=a.verb=="groupInvite",untargeted=a.verb=="groupDecline"||a.verb=="groupLeave"||a.verb=="groupDisband";
+        if(!untargeted && (!a.target.isValid()||a.targetName.empty()))return false;
+        MessageQueueCommandQueueEnqueue *data=new MessageQueueCommandQueueEnqueue(sequence,Crc::normalizeAndCalculate(name),
+            named||untargeted?NetworkId::cms_invalid:a.target,named?Unicode::narrowToWide(a.targetName):Unicode::String());
+        out.payload=data;out.command=name;
+        out.message=new ObjControllerMessage(character,CM_commandQueueEnqueue,0,clientControllerFlags,data);return true;
+    }
+    // ClientSecureTradeManager: request names the recipient; accept and deny carry no ids.
+    MessageQueueSecureTrade::TradeMessageId tmi=MessageQueueSecureTrade::TMI_LastTradeMessageId;NetworkId recipient;
+    if(a.verb=="tradeRequest"){if(!a.target.isValid())return false;tmi=MessageQueueSecureTrade::TMI_RequestTrade;recipient=a.target;}
+    else if(a.verb=="tradeAccept")tmi=MessageQueueSecureTrade::TMI_AcceptTrade;
+    else if(a.verb=="tradeDeny")tmi=MessageQueueSecureTrade::TMI_DeniedTrade;
+    if(tmi!=MessageQueueSecureTrade::TMI_LastTradeMessageId) {
+        MessageQueueSecureTrade *data=new MessageQueueSecureTrade(tmi,NetworkId::cms_invalid,recipient);
+        out.payload=data;out.message=new ObjControllerMessage(character,CM_secureTrade,0,clientControllerFlags,data);return true;
+    }
+    if(a.verb=="tradeItem"){if(!a.target.isValid())return false;out.message=new AddItemMessage(a.target);return true;}
+    if(a.verb=="tradeCredits"){if(a.amount<1||a.amount>1000000)return false;out.message=new GiveMoneyMessage(a.amount);return true;}
+    if(a.verb=="tradeOffer"){out.message=new AcceptTransactionMessage();return true;}
+    if(a.verb=="tradeUnoffer"){out.message=new UnAcceptTransactionMessage();return true;}
+    if(a.verb=="tradeVerify"){out.message=new VerifyTradeMessage();return true;}
+    if(a.verb=="tradeReject"){out.message=new DenyTradeMessage();return true;}
+    if(a.verb=="tradeCancel"){out.message=new AbortTradeMessage();return true;}
+    // CuiInstantMessageManager: a tell is a chat message the connection server forwards to chat.
+    // The name alone is given; the chat server completes game code and cluster.
+    if(a.verb=="tell"){if(a.targetName.empty()||!tellText(a.text))return false;
+        out.message=new ChatInstantMessageToCharacter(sequence,ChatAvatarId(a.targetName),Unicode::narrowToWide(a.text),Unicode::String());return true;}
+    return false;
+}
+char const *tradeMessageName(int id) {
+    switch(id){case MessageQueueSecureTrade::TMI_RequestTrade:return "request";case MessageQueueSecureTrade::TMI_TradeRequested:return "requested";
+    case MessageQueueSecureTrade::TMI_AcceptTrade:return "accept";case MessageQueueSecureTrade::TMI_DeniedTrade:return "denied";
+    case MessageQueueSecureTrade::TMI_DeniedPlayerBusy:return "busy";case MessageQueueSecureTrade::TMI_DeniedPlayerUnreachable:return "unreachable";
+    case MessageQueueSecureTrade::TMI_RequestTradeReversed:return "reversed";default:return "unknown";}
+}
 class Peer:public Connection {
 public:
     Peer(Driver &d,bool login,std::string const &host,unsigned short port);
@@ -122,6 +198,34 @@ struct Driver {
     }
     void receive(Peer &p,Archive::ByteStream const &bytes);
     void action(std::string const &line);
+    void reply(std::string const &id,std::string const &verb,bool accepted,std::string const &detail) {
+        event("reply","\"request\":"+id+",\"verb\":"+quote(verb)+",\"accepted\":"+(accepted?"true":"false")+(detail.empty()?"":","+detail));
+    }
+    // A held-session request: "@<id> <verb> [companion] [value...]". Exactly one reply event
+    // per request; a refused request is reported, not fatal, so the controller tears down.
+    void request(std::string const &line) {
+        size_t space=line.find(' ');std::string id=line.substr(1,space==std::string::npos?std::string::npos:space-1);
+        if(id.empty()||id.size()>6||id[0]=='0'||id.find_first_not_of("0123456789")!=std::string::npos){fail("invalid request id");return;}
+        std::string rest=space==std::string::npos?"":line.substr(space+1);std::istringstream in(rest);ClientAction a;std::string target,extra;in>>a.verb;
+        if(!ready||!game){reply(id,a.verb,false,"\"reason\":\"session not ready\"");return;}
+        bool const takesTarget=a.verb=="groupInvite"||a.verb=="groupJoin"||a.verb=="groupUninvite"||a.verb=="groupMakeLeader"||
+            a.verb=="groupDismiss"||a.verb=="tradeRequest"||a.verb=="tell";
+        if(takesTarget) {
+            if(!(in>>target)||!companions.find(target)){reply(id,a.verb,false,"\"reason\":\"not a roster companion\"");return;}
+            a.target=NetworkId(target);a.targetName=*companions.find(target);
+        }
+        if(a.verb=="tradeItem"){if(!(in>>target)||!number(target)||target[0]=='-'||target=="0"||target.size()>19||(target.size()==19&&target>"9223372036854775807")){reply(id,a.verb,false,"\"reason\":\"invalid item\"");return;}a.target=NetworkId(target);}
+        if(a.verb=="tradeCredits"){if(!(in>>target)||!number(target)||target[0]=='-'||target.size()>7){reply(id,a.verb,false,"\"reason\":\"invalid amount\"");return;}a.amount=std::atoi(target.c_str());}
+        if(a.verb=="tell"){std::getline(in,a.text);if(!a.text.empty()&&a.text[0]==' ')a.text.erase(0,1);}
+        else if(in>>extra){reply(id,a.verb,false,"\"reason\":\"unexpected argument\"");return;}
+        Outgoing out;unsigned int const seq=++sequence;
+        if(!buildClientAction(a,character,seq,out)){reply(id,a.verb,false,"\"reason\":\"invalid client action\"");return;}
+        if(!out.command.empty())commands[seq]=out.command;
+        game->message(*out.message);
+        std::ostringstream detail;detail<<"\"sequence\":"<<seq;
+        if(a.target.isValid())detail<<",\"target\":"<<quote(a.target.getValueString());
+        reply(id,a.verb,true,detail.str());
+    }
     void tick() {
         if(seconds()>expires){fail("session deadline");return;}
         if(finishAt && seconds()>=finishAt){done=true;return;}
@@ -139,7 +243,7 @@ struct Driver {
         if(n>0) {input.append(buffer,n);if(input.size()>4096){fail("input bound");return;}}
         else if(n==0&&!finishAt){finishAt=seconds()+2;if(game)game->disconnect();event("input_closed");}
         size_t end;
-        while(!done && (end=input.find('\n'))!=std::string::npos){std::string line=input.substr(0,end);input.erase(0,end+1);action(line);}
+        while(!done && (end=input.find('\n'))!=std::string::npos){std::string line=input.substr(0,end);input.erase(0,end+1);if(!line.empty()&&line[0]=='@')request(line);else action(line);}
     }
 };
 Peer::Peer(Driver &d,bool isLogin,std::string const &host,unsigned short port):Connection(host,port,udpSetup()),driver(d),login(isLogin) {}
@@ -201,15 +305,20 @@ void Driver::receive(Peer &p,Archive::ByteStream const &bytes) {
         if(msg.getNetworkId()==character && !ownBaselines){ownBaselines=true;event("character_baselines");}
     } else if(envelope.isType("ObjControllerMessage")) {
         ControllerHeader header(reader);
-        if(header.message.get()!=CM_netUpdateTransform && header.message.get()!=CM_netUpdateTransformWithParent && header.message.get()!=CM_objectMenuResponse && header.message.get()!=CM_npcConversationStart && header.message.get()!=CM_npcConversationResponses && header.message.get()!=CM_commandQueueRemove)return;
+        if(header.message.get()!=CM_netUpdateTransform && header.message.get()!=CM_netUpdateTransformWithParent && header.message.get()!=CM_objectMenuResponse && header.message.get()!=CM_npcConversationStart && header.message.get()!=CM_npcConversationResponses && header.message.get()!=CM_commandQueueRemove && header.message.get()!=CM_secureTrade)return;
         reader=bytes.begin();
         ObjControllerMessage msg(reader);
         std::auto_ptr<MessageQueue::Data> owned(msg.getData());
         MessageQueueCommandQueueRemove const *result=dynamic_cast<MessageQueueCommandQueueRemove const *>(msg.getData());
         if(result && msg.getNetworkId()==character) {
-            std::ostringstream fields;fields<<"\"command\":"<<quote(commands[result->getSequenceId()])<<",\"status\":"<<result->getStatus()<<",\"detail\":"<<result->getStatusDetail();
+            std::ostringstream fields;fields<<"\"command\":"<<quote(commands[result->getSequenceId()])<<",\"status\":"<<result->getStatus()<<",\"detail\":"<<result->getStatusDetail()<<",\"sequence\":"<<result->getSequenceId();
             commands.erase(result->getSequenceId());event("command_result",fields.str());
         }
+        // CreatureController::tradeRequested / handleSecureTradeMessage and
+        // ServerSecureTradeManager::refuseTrade answer on CM_secureTrade.
+        MessageQueueSecureTrade const *trade=dynamic_cast<MessageQueueSecureTrade const *>(msg.getData());
+        if(trade && msg.getNetworkId()==character)
+            event("secure_trade","\"trade\":"+quote(tradeMessageName(trade->getTradeMessageId()))+",\"initiator\":"+quote(trade->getInitiator().getValueString())+",\"recipient\":"+quote(trade->getRecipient().getValueString()));
         MessageQueueStartNpcConversation const *start=dynamic_cast<MessageQueueStartNpcConversation const *>(msg.getData());
         if(start && msg.getNetworkId()==character) {conversation=start->getNpc();responses.clear();event("conversation_started","\"target\":"+quote(conversation.getValueString()));}
         MessageQueueStringList const *options=dynamic_cast<MessageQueueStringList const *>(msg.getData());
@@ -262,6 +371,25 @@ void Driver::receive(Peer &p,Archive::ByteStream const &bytes) {
         }
         event("system_message","\"text\":"+quote(Unicode::wideToNarrow(msg.getMessage()))+",\"string_id\":"+quote(key));
     }
+    // ServerSecureTrade sends these to one or both traders (beginTrading, addItem, giveMoney,
+    // acceptOffer, unacceptOffer, beginVerification, verifyTrade, rejectOffer, completeTrade, cancelTrade).
+    else if(envelope.isType("BeginTradeMessage")){BeginTradeMessage msg(reader);event("trade_begun","\"partner\":"+quote(msg.getPlayerId().getValueString()));}
+    else if(envelope.isType("AddItemMessage")){AddItemMessage msg(reader);event("trade_item_added","\"item\":"+quote(msg.getNetworkId().getValueString()));}
+    else if(envelope.isType(AddItemFailedMessage::MessageType)){AddItemFailedMessage msg(reader);event("trade_item_failed","\"item\":"+quote(msg.getNetworkId().getValueString()));}
+    else if(envelope.isType("RemoveItemMessage")){RemoveItemMessage msg(reader);event("trade_item_removed","\"item\":"+quote(msg.getNetworkId().getValueString()));}
+    else if(envelope.isType("GiveMoneyMessage")){GiveMoneyMessage msg(reader);std::ostringstream f;f<<"\"amount\":"<<msg.getAmount();event("trade_credits",f.str());}
+    else if(envelope.isType("AcceptTransactionMessage"))event("trade_offer_accepted");
+    else if(envelope.isType("UnAcceptTransactionMessage"))event("trade_offer_withdrawn");
+    else if(envelope.isType("BeginVerificationMessage"))event("trade_verification");
+    else if(envelope.isType("VerifyTradeMessage"))event("trade_verified");
+    else if(envelope.isType("DenyTradeMessage"))event("trade_rejected");
+    else if(envelope.isType("TradeCompleteMessage"))event("trade_complete");
+    else if(envelope.isType("AbortTradeMessage"))event("trade_aborted");
+    // ChatServer answers a tell with ChatOnSendInstantMessage and delivers ChatInstantMessageToClient.
+    else if(envelope.isType("ChatOnSendInstantMessage")){ChatOnSendInstantMessage msg(reader);std::ostringstream f;f<<"\"sequence\":"<<msg.getSequence()<<",\"result\":"<<msg.getResult();event("tell_result",f.str());}
+    else if(envelope.isType("ChatInstantMessageToClient")){ChatInstantMessageToClient msg(reader);std::string text=Unicode::wideToNarrow(msg.getMessage());if(text.size()>400)text.resize(400);
+        for(size_t i=0;i<text.size();++i)if(text[i]<32||text[i]>126)text[i]='?';
+        event("tell_received","\"from\":"+quote(msg.getFromName().name)+",\"text\":"+quote(text));}
     else if(envelope.isType("LogoutMessage")){finishAt=seconds()+2;p.disconnect();event("logout_accepted");}
 }
 void Driver::action(std::string const &line) {
@@ -273,10 +401,13 @@ void Driver::action(std::string const &line) {
     }
     if(!ready||!game){fail("action before scene ready");return;}
     if(command=="holdArrival" && !(in>>extra) && !holdArrival) {holdArrival=true;event("arrival_held");return;}
+#ifndef SWG_STUDIO_PROFILE_RESTORATION
+    // The restoration tree's CreateProjectileMessage takes a ship id first; that profile has no ships.
     if(command=="fire" && !(in>>extra) && ship.isValid() && shipStampAt>0) {
         uint32 const stamp=shipStamp+static_cast<uint32>((seconds()-shipStampAt)*1000.0);
         CreateProjectileMessage shot(0,0,0,0,shipTransform,stamp);game->message(shot);event("shot_requested");return;
     }
+#endif
     if(command=="trackShip" && (in>>target) && !(in>>extra) && number(target) && target[0]!='-' && (!ship.isValid() || ship==NetworkId(target))) {
         ship=NetworkId(target);event("ship_tracked","\"ship\":"+quote(target));return;
     }
@@ -364,16 +495,36 @@ int runDriver() {
     while(!d.done){Clock::update();NetworkHandler::update();NetworkHandler::dispatch();d.tick();Os::sleep(10);}
     return d.failed?1:0;
 }
+// Offline wire check: print the bytes one client action would send, then exit. No config,
+// no network. Usage: driver --encode <character> <sequence> <verb> [target] [name] [value...]
+int encodeClientAction(int argc,char **argv) {
+    if(argc<5||!number(argv[2])||argv[2][0]=='-'||!number(argv[3])||argv[3][0]=='-')return 2;
+    ClientAction a;a.verb=argv[4];int next=5;
+    if(next<argc && number(argv[next]) && argv[next][0]!='-'){a.target=NetworkId(std::string(argv[next]));++next;}
+    if(a.verb=="tradeCredits"){if(!a.target.isValid())return 2;a.amount=static_cast<int>(std::atol(argv[5]));a.target=NetworkId::cms_invalid;}
+    else if(next<argc){a.targetName=argv[next++];}
+    for(;next<argc;++next){if(!a.text.empty())a.text+=' ';a.text+=argv[next];}
+    Outgoing out;if(!buildClientAction(a,NetworkId(std::string(argv[2])),static_cast<uint32>(std::strtoul(argv[3],0,10)),out))return 1;
+    Archive::ByteStream bytes;out.message->pack(bytes);std::string hex;char digits[3];
+    for(unsigned int i=0;i<bytes.getSize();++i){std::sprintf(digits,"%02x",bytes.getBuffer()[i]);hex+=digits;}
+    std::printf("ENCODED %s %s\n",a.verb.c_str(),hex.c_str());std::fflush(stdout);return 0;
 }
-int main(int argc,char **argv) {
-    if(sizeof(void*)!=8 || argc!=2)return 2;
-    SetupSharedThread::install();SetupSharedDebug::install(1024);SetupSharedFoundation::Data foundation(SetupSharedFoundation::Data::D_game);SetupSharedFoundation::install(foundation);
-    if(!ConfigFile::loadFile(argv[1]))return 2;
-    SetupSharedFile::install(false);SetupSharedRandom::install(1);SetupSharedNetwork::SetupData network;SetupSharedNetwork::getDefaultClientSetupData(network);SetupSharedNetwork::install(network);
+void installControllerMessages() {
     ControllerMessageFactory::install();ObjControllerMessage::install();
     MessageQueueDataTransform::install();MessageQueueDataTransformWithParent::install();
     MessageQueueTeleportAck::install();MessageQueueObjectMenuRequest::install();MessageQueueCommandQueueEnqueue::install();
     MessageQueueStartNpcConversation::install();MessageQueueStringList::install();
-    MessageQueueCommandQueueRemove::install();
+    MessageQueueCommandQueueRemove::install();MessageQueueSecureTrade::install();
+}
+}
+int main(int argc,char **argv) {
+    if(sizeof(void*)!=8)return 2;
+    bool const encode=argc>=2 && std::strcmp(argv[1],"--encode")==0;
+    if(argc!=2 && !encode)return 2;
+    SetupSharedThread::install();SetupSharedDebug::install(1024);SetupSharedFoundation::Data foundation(SetupSharedFoundation::Data::D_game);SetupSharedFoundation::install(foundation);
+    if(encode){installControllerMessages();int result=encodeClientAction(argc,argv);SetupSharedFoundation::remove();SetupSharedThread::remove();return result;}
+    if(!ConfigFile::loadFile(argv[1]))return 2;
+    SetupSharedFile::install(false);SetupSharedRandom::install(1);SetupSharedNetwork::SetupData network;SetupSharedNetwork::getDefaultClientSetupData(network);SetupSharedNetwork::install(network);
+    installControllerMessages();
     int result=runDriver();SetupSharedFoundation::remove();SetupSharedThread::remove();return result;
 }
