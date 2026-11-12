@@ -53,6 +53,13 @@ for its own options (`devtools/zones/protocol_driver.py:448`).
   (`devtools/zones/server_profile.py:113`): the bundled `login_relogin` and `create_character`.
 - `agent_fixture` steps (`devtools/zones/server_profile.py:112`).
 
+Group steps (`action_sequence`, `ship_group`, `group_affinity_*`) stay refused for a real reason: they need the
+Tansaari station or an Ord ship and whitengold-only staging (`devtools/zones/studio_actions.py:99-103`). The typed
+`client` steps (group, secure trade and held sessions; `docs/fixture-client-actions.md`) need no station. They
+compile to `client_action` cases, which this profile does not list yet: the held-session runner and the trade peer
+commands are still to land with a refresh of `devtools/studio-tools.json`. Until then a `client` step is refused here
+like any other unsupported step.
+
 ## What a prepared restoration test server must provide
 
 Studio prepares nothing; it only verifies. All of these are the same checks the
