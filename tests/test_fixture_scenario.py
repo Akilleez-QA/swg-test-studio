@@ -371,7 +371,8 @@ class StepTests(unittest.TestCase):
         with mock.patch.object(af, "REGISTRY", reg):
             model.validate(self.suite(steps), runnable=True)
             rows = af.scenario_ids(steps, reg)
-            self.assertEqual(rows, [{"id": "arena_1", "begun": ["open"], "ended": ["close"], "used": ["rat", "chair"]}])
+            self.assertEqual(rows, [{"id": "arena_1", "role": "actor", "begun": ["open"], "ended": ["close"],
+                                     "used": ["rat", "chair"], "problems": []}])
             # Seeded fault: a creating step without its scenario id fails validation.
             del steps[1]["options"]["scenario"]
             with self.assertRaises(ValueError):
@@ -383,6 +384,11 @@ class StepTests(unittest.TestCase):
         self.assertIsNone(af.check(reply, {"destroyed": "3", "open": "none"}))
         self.assertEqual(af.check(af.parse("agent_scenario=refused reason=scenario-not-open", "agent_scenario", reg),
                                   {}), "fixture status refused")
+        # A scenarioEnd that left objects behind fails its step, whatever its expect says.
+        partial = af.parse("agent_scenario=partial scenario=arena_1 destroyed=1 leaked=2 open=arena_1",
+                           "agent_scenario", reg)
+        self.assertEqual(af.check(partial, {"destroyed": "1"}), "fixture status partial")
+        self.assertIsNone(af.check(partial, {"leaked": "2"}, accept=("ok", "partial")))
         # Seeded fault: a reply of the core class does not satisfy a scenario step.
         self.assertEqual(af.parse("agent_fixture=ok destroyed=3", "agent_scenario", reg)["status"], "unrecognized")
 

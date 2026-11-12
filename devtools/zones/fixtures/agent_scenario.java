@@ -17,7 +17,11 @@ import script.library.*;
  * (the scenario id) and fixture.owner (the bot). Creating ops take the
  * scenario id as their first argument and refuse unless it is the id the
  * bot has open (objvar fixture.scenario_open, set by scenarioBegin).
- * scenarioEnd destroys what is tagged with the id and still reachable.
+ * The open scenario also records every id it created and has not yet
+ * destroyed (fixture.scenario_ids) and the scene it was opened in.
+ * scenarioEnd destroys what is tagged with the id and reachable, and
+ * reports what the record says is left (leaked); while anything is left
+ * the scenario stays open and the status is "partial".
  *
  * No free-form command, script name, class name or expression; no god or
  * admin grant; no player or creature-player template; never another
@@ -39,12 +43,20 @@ public class agent_scenario extends base_script {
     private static final String TAG_OWNER="fixture.owner";
     private static final String OPEN_VAR="fixture.scenario_open";
     private static final String CREATED_VAR="fixture.scenario_created";
+    private static final String IDS_VAR="fixture.scenario_ids";
+    private static final String SCENE_VAR="fixture.scenario_scene";
     private static final String TEST_VAR_ROOT="fixture.t";
-    private static final int SCENARIO_CREATE_MAX=200;
+    private static final String SNAPSHOT_ROOT="fixture.snapshot";
+    private static final int SCENARIO_CREATE_MAX=100;
     private static final int SCENARIO_END_MAX=1000;
+    // At most this many object ids are listed in one *_ids reply field.
+    private static final int IDS_MAX=32;
 
     // Typed arguments (the same regexes and bounds as swg_test_studio/fixture_ops/scenario.py).
-    private static final String TEMPLATE_RE="object/(tangible|weapon|static)/([a-z0-9_]{1,64}/){0,7}[a-z0-9_]{1,64}\\.iff";
+    // Allowed template subtrees (inert items and props; docs/fixture-scenario.md says why each).
+    private static final String TEMPLATE_RE="object/(tangible/(container|furniture|food|medicine|loot|wearables|component|instrument|painting)|weapon/(melee|ranged)|static/(item|structure|flora))/([a-z0-9_]{1,64}/){0,6}[a-z0-9_]{1,64}\\.iff";
+    // Refused anywhere in a template path, even inside an allowed subtree.
+    private static final String[] TEMPLATE_DENY={"/shared_","/player/","/terminal/","/spawning/","/gm/","/deed/","character_builder","admin"};
     private static final int TEMPLATE_MAX=200;
     private static final String CREATURE_RE="[a-z0-9_]{1,64}";
     private static final String QUEST_RE="[a-z0-9_]{1,64}(/[a-z0-9_]{1,64}){0,3}";
@@ -210,10 +222,10 @@ public class agent_scenario extends base_script {
 
     private static String match(String s,String re) {return s!=null && s.matches(re)?s:null;}
 
-    /** An object template of an allowed category, never a shared (client) template. */
+    /** An object template of an allowed subtree, never a shared (client), player, terminal, spawner, GM, deed or admin template. */
     private static String template(String s) {
         if(s==null || s.length()>TEMPLATE_MAX || !s.matches(TEMPLATE_RE)) return null;
-        if(s.contains("/shared_") || s.contains("/player/")) return null;
+        for(String deny:TEMPLATE_DENY) if(s.contains(deny)) return null;
         return s;
     }
 
@@ -235,13 +247,36 @@ public class agent_scenario extends base_script {
         return null;
     }
 
-    /** Tags a freshly created object; destroys it when tagging fails. */
+    /** The ids the open scenario created and has not destroyed (fixture.scenario_ids). */
+    private static java.util.List<obj_id> liveIds(obj_id bot) throws InterruptedException {
+        java.util.List<obj_id> ids=new java.util.ArrayList<obj_id>();
+        obj_id[] stored=hasObjVar(bot,IDS_VAR)?getObjIdArrayObjVar(bot,IDS_VAR):null;
+        if(stored!=null) for(obj_id x:stored) if(isIdValid(x) && !ids.contains(x)) ids.add(x);
+        return ids;
+    }
+
+    /** Replaces the record of live created ids; an empty list removes it. */
+    private static boolean storeIds(obj_id bot,java.util.List<obj_id> ids) throws InterruptedException {
+        if(ids.isEmpty()) {removeObjVar(bot,IDS_VAR);return true;}
+        return setObjVar(bot,IDS_VAR,ids.toArray(new obj_id[0]));
+    }
+
+    /** Tags a freshly created object, records its id and counts it against the cap; destroys it when any of that fails. */
     private static boolean tag(obj_id bot,obj_id o,String id) throws InterruptedException {
         if(!isIdValid(o)) return false;
         if(!setObjVar(o,TAG_SCENARIO,id) || !setObjVar(o,TAG_OWNER,bot)) {destroyObject(o);return false;}
+        java.util.List<obj_id> ids=liveIds(bot);
+        ids.add(o);
+        if(!storeIds(bot,ids)) {destroyObject(o);return false;}
         int created=hasObjVar(bot,CREATED_VAR)?getIntObjVar(bot,CREATED_VAR):0;
         setObjVar(bot,CREATED_VAR,created+1);
         return true;
+    }
+
+    /** Drops a destroyed object from the record of live created ids. */
+    private static void forget(obj_id bot,obj_id o) throws InterruptedException {
+        java.util.List<obj_id> ids=liveIds(bot);
+        if(ids.remove(o)) storeIds(bot,ids);
     }
 
     /** The scenario id o is tagged with for this bot, or null when o was not created for it. */
@@ -293,7 +328,8 @@ public class agent_scenario extends base_script {
         String open=openScenario(bot);
         if(id.equals(open)) return P+"ok scenario="+id+" already=true";
         if(open!=null) return fail("refused reason=other-scenario-open open="+enc(open));
-        boolean ok=setObjVar(bot,OPEN_VAR,id) && setObjVar(bot,CREATED_VAR,0);
+        removeObjVar(bot,IDS_VAR);
+        boolean ok=setObjVar(bot,OPEN_VAR,id) && setObjVar(bot,CREATED_VAR,0) && setObjVar(bot,SCENE_VAR,getCurrentSceneName());
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"scenario",id);kv(sb,"already",false);kv(sb,"scene",getCurrentSceneName());kv(sb,"cap",SCENARIO_CREATE_MAX);
         return sb.toString();
@@ -320,9 +356,16 @@ public class agent_scenario extends base_script {
 
     /**
      * scenarioEnd <id>: destroys every reachable object tagged with the id
-     * for this bot (at most SCENARIO_END_MAX), clears the open record when
-     * it is this id, and removes the bot's fixture.t.* test objvars. Safe to
-     * repeat: a second call reports destroyed=0.
+     * for this bot (at most SCENARIO_END_MAX) and removes the bot's
+     * fixture.t.* test objvars and fixture.snapshot.* snapshots. When the id
+     * is the open scenario, every recorded id that was not removed and is
+     * still loaded here (out of reach), or that cannot be checked because
+     * the bot is no longer in the scenario's scene, is leaked: the status is
+     * then "partial", the scenario stays open (so its cap still holds) and a
+     * later call can finish the cleanup. A recorded id that is no longer
+     * loaded in the scenario's own scene counts as removed (with_container;
+     * the game destroyed it). Only a clean end clears the open record. Safe
+     * to repeat: a second call reports destroyed=0.
      */
     public String scenarioEnd(String value) throws InterruptedException {
         Object[] q=request(value,"scenarioEnd",1,1);
@@ -330,25 +373,48 @@ public class agent_scenario extends base_script {
         obj_id bot=(obj_id)q[1];String[] args=(String[])q[2];
         String id=match(args[0],SCENARIO_RE);
         if(id==null) return invalidArgs("scenario");
+        String open=openScenario(bot);
+        boolean wasOpen=id.equals(open);
         java.util.List<obj_id> found=reachableTagged(bot,id);
+        java.util.Set<obj_id> removed=new java.util.HashSet<obj_id>();
         int destroyed=0,failed=0,gone=0;
         boolean truncated=false;
         for(obj_id o:found) {
             if(destroyed+failed>=SCENARIO_END_MAX) {truncated=true;break;}
-            if(!exists(o)) {gone++;continue;}  // went with a destroyed container
-            if(destroyObject(o)) destroyed++;
+            if(!exists(o)) {gone++;removed.add(o);continue;}  // went with a destroyed container
+            if(destroyObject(o)) {destroyed++;removed.add(o);}
             else failed++;
         }
-        String open=openScenario(bot);
-        boolean wasOpen=id.equals(open);
-        if(wasOpen && !truncated) {removeObjVar(bot,OPEN_VAR);removeObjVar(bot,CREATED_VAR);}
+        java.util.List<obj_id> leaked=new java.util.ArrayList<obj_id>();
+        if(wasOpen) {
+            String home=hasObjVar(bot,SCENE_VAR)?getStringObjVar(bot,SCENE_VAR):null;
+            boolean homeScene=home!=null && home.equals(getCurrentSceneName());
+            for(obj_id o:liveIds(bot)) {
+                if(removed.contains(o)) continue;
+                if(exists(o) || !homeScene) leaked.add(o);
+                else gone++;
+            }
+            storeIds(bot,leaked);
+        }
+        boolean clean=failed==0 && !truncated && leaked.isEmpty();
+        if(wasOpen && clean) {removeObjVar(bot,OPEN_VAR);removeObjVar(bot,CREATED_VAR);removeObjVar(bot,IDS_VAR);removeObjVar(bot,SCENE_VAR);}
         boolean vars=hasObjVar(bot,TEST_VAR_ROOT);
         if(vars) removeObjVar(bot,TEST_VAR_ROOT);
-        StringBuilder sb=start(failed==0 && !truncated?"ok":"refused");
+        boolean snapshots=hasObjVar(bot,SNAPSHOT_ROOT);
+        if(snapshots) removeObjVar(bot,SNAPSHOT_ROOT);
+        StringBuilder sb=start(failed>0 || truncated?"refused":(leaked.isEmpty()?"ok":"partial"));
         kv(sb,"scenario",id);kv(sb,"destroyed",destroyed);kv(sb,"with_container",gone);kv(sb,"failed",failed);
-        kv(sb,"truncated",truncated);kv(sb,"was_open",wasOpen);kv(sb,"open",wasOpen && !truncated?"none":(open==null?"none":open));
-        kv(sb,"test_vars_cleared",vars);kv(sb,"scene",getCurrentSceneName());
+        kv(sb,"leaked",leaked.size());kv(sb,"leaked_ids",joinIds(leaked));
+        kv(sb,"truncated",truncated);kv(sb,"was_open",wasOpen);kv(sb,"open",wasOpen && clean?"none":(open==null?"none":open));
+        kv(sb,"test_vars_cleared",vars);kv(sb,"snapshots_cleared",snapshots);kv(sb,"scene",getCurrentSceneName());
         return sb.toString();
+    }
+
+    /** The first IDS_MAX ids, comma separated ("" when none). */
+    private static String joinIds(java.util.List<obj_id> ids) {
+        StringBuilder b=new StringBuilder();
+        for(int i=0;i<ids.size() && i<IDS_MAX;i++) b.append(i==0?"":",").append(ids.get(i));
+        return b.toString();
     }
 
     /** scenarioList <id>: rows oid, template, where (carried|building|world), distance for each reachable tagged object. */
@@ -363,12 +429,13 @@ public class agent_scenario extends base_script {
         String open=openScenario(bot);
         StringBuilder sb=start("ok");
         kv(sb,"scenario",id);kv(sb,"open",open==null?"none":open);kv(sb,"count",found.size());
-        kv(sb,"created",hasObjVar(bot,CREATED_VAR)?getIntObjVar(bot,CREATED_VAR):0);kv(sb,"scene",getCurrentSceneName());
+        kv(sb,"created",hasObjVar(bot,CREATED_VAR)?getIntObjVar(bot,CREATED_VAR):0);
+        kv(sb,"live",id.equals(open)?liveIds(bot).size():0);kv(sb,"scene",getCurrentSceneName());
         int[] rc=new int[2];
         for(obj_id o:found) {
             obj_id top=getTopMostContainer(o);
             String where=bot.equals(top)?"carried":(building!=null && building.equals(top)?"building":"world");
-            row(sb,rc,o,getTemplateName(o),where,String.format("%.1f",getDistance(bot,o)));
+            row(sb,rc,o,getTemplateName(o),where,String.format(java.util.Locale.ROOT,"%.1f",getDistance(bot,o)));
         }
         return end(sb,rc);
     }
@@ -460,6 +527,7 @@ public class agent_scenario extends base_script {
         if(s!=null) return fail(s);
         String id=taggedFor(bot,o);
         boolean ok=destroyObject(o);
+        if(ok) forget(bot,o);
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"object",o);kv(sb,"scenario",id);
         return sb.toString();
@@ -480,7 +548,11 @@ public class agent_scenario extends base_script {
         if(id==null || name==null || dx==null || dz==null || level==null) return invalidArgs("spawnCreature");
         String s=mayCreate(bot,id,1);
         if(s!=null) return fail(s);
-        if(dataTableSearchColumnForString(name,"creatureName",create.CREATURE_TABLE)<0) return fail("refused reason=unknown-creature name="+enc(name));
+        int row=dataTableSearchColumnForString(name,"creatureName",create.CREATURE_TABLE);
+        if(row<0) return fail("refused reason=unknown-creature name="+enc(name));
+        // A row with scripts (AI roles, conversations, spawners) could create untagged adds: refused.
+        String scripts=dataTableGetString(create.CREATURE_TABLE,row,"scripts");
+        if(scripts!=null && scripts.trim().length()>0) return fail("refused reason=scripted-creature name="+enc(name));
         location target=near(bot,dx,dz);
         if(target==null) return fail("refused reason=no-location");
         obj_id c=create.createCreature(name,target,level,true,false);
@@ -488,7 +560,7 @@ public class agent_scenario extends base_script {
         if(!tag(bot,c,id)) return fail("refused reason=spawn-failed name="+enc(name));
         StringBuilder sb=start("ok");
         kv(sb,"creature",c);kv(sb,"name",name);kv(sb,"scenario",id);kv(sb,"template",getTemplateName(c));
-        kv(sb,"level",getLevel(c));kv(sb,"distance",String.format("%.1f",getDistance(bot,c)));
+        kv(sb,"level",getLevel(c));kv(sb,"distance",String.format(java.util.Locale.ROOT,"%.1f",getDistance(bot,c)));
         return sb.toString();
     }
 
@@ -582,6 +654,7 @@ public class agent_scenario extends base_script {
         String s=created(bot,c,true);
         if(s!=null) return fail(s);
         boolean ok=destroyObject(c);
+        if(ok) forget(bot,c);
         StringBuilder sb=start(ok?"ok":"refused");
         kv(sb,"creature",c);
         return sb.toString();
@@ -771,6 +844,11 @@ public class agent_scenario extends base_script {
         if(scene==null || x==null || y==null || z==null) return invalidArgs("warpScene");
         String from=getCurrentSceneName();
         String open=openScenario(bot);
+        // Created objects stay behind on the old scene's server, out of scenarioEnd's reach.
+        if(open!=null && !liveIds(bot).isEmpty()) {
+            String home=hasObjVar(bot,SCENE_VAR)?getStringObjVar(bot,SCENE_VAR):null;
+            if(!scene.equals(home)) return fail("refused reason=scenario-open open="+enc(open)+" home="+enc(home));
+        }
         warpPlayer(bot,scene,x,y,z,(obj_id)null,0.0f,0.0f,0.0f);
         StringBuilder sb=start("ok");
         kv(sb,"scene",scene);kv(sb,"from",from);kv(sb,"x",x);kv(sb,"y",y);kv(sb,"z",z);

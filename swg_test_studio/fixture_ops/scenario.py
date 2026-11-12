@@ -10,9 +10,24 @@ FIXTURE = "agent_scenario"
 
 _NUMBER = r"-?[0-9]{1,5}(\.[0-9]{1,6})?"  # the fixture's NUM_RE
 
-# Object template categories a scenario may create (see docs/fixture-scenario.md for why these).
-TEMPLATE_CATEGORIES = ("tangible", "weapon", "static")
+# Object template subtrees a scenario may create: inert items and props (docs/fixture-scenario.md
+# says why each). The Java class (TEMPLATE_RE, TEMPLATE_DENY) holds exactly the same lists.
+TEMPLATE_SUBTREES = (
+    "tangible/container", "tangible/furniture", "tangible/food", "tangible/medicine", "tangible/loot",
+    "tangible/wearables", "tangible/component", "tangible/instrument", "tangible/painting",
+    "weapon/melee", "weapon/ranged", "static/item", "static/structure", "static/flora",
+)
+# Refused anywhere in a template path, even inside an allowed subtree (furniture/terminal/... exists).
+TEMPLATE_DENY = ("/shared_", "/player/", "/terminal/", "/spawning/", "/gm/", "/deed/", "character_builder", "admin")
 TEMPLATE_MAX = 200
+
+
+def _subtree_regex():
+    groups = {}
+    for subtree in TEMPLATE_SUBTREES:
+        top, sub = subtree.split("/")
+        groups.setdefault(top, []).append(sub)
+    return "(" + "|".join(f"{top}/({'|'.join(subs)})" for top, subs in groups.items()) + ")"
 
 # Open-world ground scenes of the server tree's datatables/region/planets.tab (no tutorial,
 # instanced dungeon, adventure or Kashyyyk sub-zone scenes).
@@ -20,7 +35,7 @@ SCENES = ("corellia", "dantooine", "dathomir", "endor", "kashyyyk_main", "lok",
           "mustafar", "naboo", "rori", "talus", "tatooine", "yavin4")
 
 TYPES = {
-    "objtemplate": r"object/(" + "|".join(TEMPLATE_CATEGORIES) + r")/([a-z0-9_]{1,64}/){0,7}[a-z0-9_]{1,64}\.iff",
+    "objtemplate": "object/" + _subtree_regex() + r"/([a-z0-9_]{1,64}/){0,6}[a-z0-9_]{1,64}\.iff",
     "creaturename": r"[a-z0-9_]{1,64}",
     "spawnlevel": r"[0-9]{1,2}",
     "spawncount": r"[0-9]{1,2}",
@@ -50,7 +65,7 @@ RANGES = {
 # Values a typed test objvar may hold (agent_scenario.java VAR_INT_MAX / VAR_FLOAT_MAX).
 VAR_INT_MAX = 999999999
 VAR_FLOAT_MAX = 100000.0
-SCENARIO_CREATE_MAX = 200
+SCENARIO_CREATE_MAX = 100
 SCENARIO_END_MAX = 1000
 
 # name -> (argument kinds, mutates). For SCENARIO_OPS the scenario id is sent first (not listed here).
@@ -97,8 +112,9 @@ def check(op, args):
         template = args[0]
         if len(template) > TEMPLATE_MAX:
             raise ValueError(f"{op}: template longer than {TEMPLATE_MAX} characters")
-        if "/shared_" in template or "/player/" in template:
-            raise ValueError(f"{op}: shared (client) and player templates are refused")
+        denied = [part for part in TEMPLATE_DENY if part in template]
+        if denied:
+            raise ValueError(f"{op}: templates containing {denied[0]!r} are refused")
     if op == "setTestVar":
         kind, value = args[2], args[3]
         if kind == "int" and (not _INT.fullmatch(value) or abs(int(value)) > VAR_INT_MAX):
